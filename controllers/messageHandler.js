@@ -41,7 +41,7 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
   if (ultimoSaludo !== hoy) {
     esPrimerMensajeDelDia = true;
     await establecerUltimoSaludo(remitente, hoy);
-    const saludo = `🌴 ¡Bienvenido(a) a Villas Yulie! 🏖️ .Tu rincón ideal frente al mar te espera.`;
+    const saludo = `🌴 ¡Bienvenido(a) a Villas Julie! 🏖️ .Tu rincón ideal frente al mar te espera.`;
     try {
       await bot.sendMessage(remitente, { text: saludo });
     } catch (error) {
