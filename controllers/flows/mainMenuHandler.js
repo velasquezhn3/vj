@@ -52,9 +52,8 @@ async function handleMainMenuOptions(bot, remitente, mensaje, establecerEstado) 
                 `Llamadas: 50499222188  \n\n` +
                 `📞 *Atención 24/7:*  \n` +
                 `WhatsApp: http://wa.me/50499905880  \n` +
-                `Llamadas: 50499905880  \n\n` +
-                `📍 *Ubicación:*  \n` +
-                `Carretera Bosque 123, Valle Bravo (Maps: [bit.ly/UbicCabañas])`
+                `Llamadas: 50499905880  \n\n`  +
+                `Escribe "menu" para volver al menú principal.`
         });
       } catch (error) {
         console.error('Error enviando contacto rápido actualizado:', error);
