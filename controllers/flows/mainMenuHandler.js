@@ -1,5 +1,7 @@
 const cabañas = require('../cabañas.json');
 const WeatherModule = require('../../services/weatherService');
+const { sendShareExperienceInstructions } = require('./shareExperience');
+const { manejarPostReserva } = require('./postReservaHandler');
 
 const weatherModule = new WeatherModule('5a9417f67be807a6e981ec69173924ac');
 
@@ -112,14 +114,19 @@ async function handleMainMenuOptions(bot, remitente, mensaje, establecerEstado) 
       break;
     case '7':
       try {
-        await bot.sendMessage(remitente, {
-          text: `🛎️ *Ayuda Post-Reserva*:\n¿En qué podemos ayudarte después de tu reserva?`
-        });
+        await sendShareExperienceInstructions(bot, remitente, establecerEstado);
       } catch (error) {
-        console.error('Error enviando ayuda post-reserva:', error);
+        console.error('Error enviando instrucciones para compartir experiencia:', error);
       }
       break;
     case '8':
+      try {
+        await manejarPostReserva(bot, remitente, mensaje, establecerEstado);
+      } catch (error) {
+        console.error('Error manejando soporte post-reserva:', error);
+      }
+      break;
+    case '9':
       try {
         await bot.sendMessage(remitente, {
           text: `💎 *Programa Fidelidad*:\nAcumule puntos y obtenga descuentos exclusivos.`
