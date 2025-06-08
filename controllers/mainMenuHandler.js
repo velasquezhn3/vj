@@ -1,7 +1,7 @@
-const cabañas = require('../cabañas.json');
-const WeatherModule = require('../../services/weatherService');
-const { sendShareExperienceInstructions } = require('./shareExperience');
-const { manejarPostReserva } = require('./postReservaHandler');
+const cabañas = require('../data/cabañas.json');
+const WeatherModule = require('../services/weatherService');
+const { sendShareExperienceInstructions } = require('../routes/shareExperience');
+const { manejarPostReserva } = require('../routes/postReservaHandler');
 
 const weatherModule = new WeatherModule('5a9417f67be807a6e981ec69173924ac');
 
@@ -36,10 +36,20 @@ async function handleMainMenuOptions(bot, remitente, mensaje, establecerEstado) 
       break;
     case '3':
       try {
-        const { handleExperienciasLocales } = require('./experienciasLocales');
-        await handleExperienciasLocales(bot, remitente, mensaje, establecerEstado);
+        const actividades = require('../data/actividades.json');
+        if (actividades.length === 0) {
+          await bot.sendMessage(remitente, { text: '⚠️ No hay actividades disponibles en este momento.' });
+          break;
+        }
+        let menu = 'Tenemos estas actividades disponibles:\n';
+        actividades.forEach((actividad, index) => {
+          menu += `${index + 1}. ${actividad.nombre}\n`;
+        });
+        menu += 'Por favor, selecciona el número de la actividad para ver más detalles.';
+        await bot.sendMessage(remitente, { text: menu });
+        await establecerEstado(remitente, 'actividades');
       } catch (error) {
-        console.error('Error ejecutando Experiencias Locales:', error);
+        console.error('Error enviando menú dinámico de actividades:', error);
       }
       break;
     case '4':

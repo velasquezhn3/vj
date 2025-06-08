@@ -6,9 +6,9 @@ const { establecerEstado, obtenerEstado, establecerUltimoSaludo, obtenerUltimoSa
 const weatherService = require('../services/weatherService');
 const { isValidDate, confirmarReserva } = require('../utils/utils');
 const constants = require('./constants');
-const { flowAlojamientos } = require('./flows/alojamientos');
-const { handleMainMenuOptions } = require('./flows/mainMenuHandler');
-const { manejarNoReserva } = require('./flows/postReservaHandler');
+const { flowAlojamientos } = require('../routes/alojamientos');
+const { handleMainMenuOptions } = require('../controllers/mainMenuHandler');
+const { manejarNoReserva } = require('../routes/postReservaHandler');
 
 /**
  * Envía el menú principal al usuario.
@@ -67,7 +67,7 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
     return;
   }
 
-const { handleShareExperienceResponse } = require('./flows/shareExperience');
+const { handleShareExperienceResponse } = require('../routes/shareExperience');
 
 switch (estado.estado) {
   case 'main':
@@ -85,7 +85,7 @@ switch (estado.estado) {
 
   case 'alojamientos':
     try {
-      const cabañas = require('./cabañas.json');
+      const cabañas = require('../data/cabañas.json');
       const seleccion = parseInt(mensaje.trim());
       if (isNaN(seleccion) || seleccion < 1 || seleccion > cabañas.length) {
         await bot.sendMessage(remitente, { text: '⚠️ Selección inválida. Por favor, ingresa un número válido del menú.' });
@@ -125,6 +125,15 @@ switch (estado.estado) {
       }
     } catch (error) {
       console.error('Error enviando detalles de cabaña:', error);
+    }
+    break;
+  case 'actividades':
+    try {
+      const { sendActividadDetails } = require('../controllers/actividadesController');
+      const seleccion = parseInt(mensaje.trim());
+      await sendActividadDetails(bot, remitente, seleccion);
+    } catch (error) {
+      console.error('Error enviando detalles de actividad:', error);
     }
     break;
 

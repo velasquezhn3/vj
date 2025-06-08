@@ -1,4 +1,4 @@
-const { establecerEstado } = require('../../services/stateService');
+const { establecerEstado } = require('../services/stateService');
 
 /**
  * Sends the instructions message for sharing Instagram photo and sets the user state.
