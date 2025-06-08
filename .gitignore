@@ -5,8 +5,7 @@ node_modules/
 .env
 
 # Data folder (sessions, cache, etc.)
-data/
-
+data/session/
 # Logs
 *.log
 logs/

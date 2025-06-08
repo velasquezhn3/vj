@@ -1,0 +1,107 @@
+[
+  {
+    "id": "cab1",
+    "nombre": "Cabaña Tortuga",
+    "tipo": "Premium",
+    "capacidad": 3,
+    "habitaciones": 1,
+    "baños": 2,
+    "fotos": [
+      "https://i.ibb.co/Gvr9MKwZ/Whats-App-Image-2025-06-04-at-3-26-09-PM-3.jpg",
+      "https://i.ibb.co/N2W8HmDJ/Whats-App-Image-2025-06-04-at-3-26-10-PM-3.jpg",
+      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg",
+      "https://i.ibb.co/0jx1RWxp/Whats-App-Image-2025-06-04-at-3-26-07-PM.jpg",
+      "https://i.ibb.co/pvnSvQJX/Whats-App-Image-2025-06-04-at-3-26-08-PM-1.jpg",
+      "https://i.ibb.co/WWGj8PsT/Whats-App-Image-2025-06-04-at-3-26-08-PM-2.jpg",
+      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg"
+    ],
+    "precio_noche": 3500,
+    "moneda": "HNL",
+    "comodidades": [
+      "Piscina privada",
+      "WiFi",
+      "Cocina equipada"
+    ],
+    "ubicacion": {
+      "ciudad": "Tela Atlántida",
+      "departamento": "Atlántida"
+    },
+    "reservas": [
+      {
+        "fecha_inicio": "2025-07-15",
+        "fecha_fin": "2025-07-18",
+        "estado": "confirmada"
+      }
+    ]
+  },
+  {
+    "id": "cab2",
+    "nombre": "Cabaña Caracol",
+    "tipo": "Premium",
+    "capacidad": 3,
+    "habitaciones": 1,
+    "baños": 2,
+    "fotos": [
+      "https://i.ibb.co/Gvr9MKwZ/Whats-App-Image-2025-06-04-at-3-26-09-PM-3.jpg",
+      "https://i.ibb.co/N2W8HmDJ/Whats-App-Image-2025-06-04-at-3-26-10-PM-3.jpg",
+      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg",
+      "https://i.ibb.co/0jx1RWxp/Whats-App-Image-2025-06-04-at-3-26-07-PM.jpg",
+      "https://i.ibb.co/pvnSvQJX/Whats-App-Image-2025-06-04-at-3-26-08-PM-1.jpg",
+      "https://i.ibb.co/WWGj8PsT/Whats-App-Image-2025-06-04-at-3-26-08-PM-2.jpg",
+      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg"
+    ],
+    "precio_noche": 3500,
+    "moneda": "HNL",
+    "comodidades": [
+      "Piscina privada",
+      "WiFi",
+      "Cocina equipada"
+    ],
+    "ubicacion": {
+      "ciudad": "Tela Atlántida",
+      "departamento": "Atlántida"
+    },
+    "reservas": [
+      {
+        "fecha_inicio": "2025-07-15",
+        "fecha_fin": "2025-07-18",
+        "estado": "confirmada"
+      }
+    ]
+  },
+  {
+    "id": "cab3",
+    "nombre": "Cabaña Delfín",
+    "tipo": "Premium",
+    "capacidad": 3,
+    "habitaciones": 1,
+    "baños": 2,
+    "fotos": [
+      "https://i.ibb.co/Gvr9MKwZ/Whats-App-Image-2025-06-04-at-3-26-09-PM-3.jpg",
+      "https://i.ibb.co/N2W8HmDJ/Whats-App-Image-2025-06-04-at-3-26-10-PM-3.jpg",
+      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg",
+      "https://i.ibb.co/0jx1RWxp/Whats-App-Image-2025-06-04-at-3-26-07-PM.jpg",
+      "https://i.ibb.co/pvnSvQJX/Whats-App-Image-2025-06-04-at-3-26-08-PM-1.jpg",
+      "https://i.ibb.co/WWGj8PsT/Whats-App-Image-2025-06-04-at-3-26-08-PM-2.jpg",
+      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg"
+    ],
+    "precio_noche": 3500,
+    "moneda": "HNL",
+    "comodidades": [
+      "Piscina privada",
+      "WiFi",
+      "Cocina equipada"
+    ],
+    "ubicacion": {
+      "ciudad": "Tela Atlántida",
+      "departamento": "Atlántida"
+    },
+    "reservas": [
+      {
+        "fecha_inicio": "2025-07-15",
+        "fecha_fin": "2025-07-18",
+        "estado": "confirmada"
+      }
+    ]
+  }
+]
