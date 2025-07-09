@@ -38,8 +38,51 @@ function isValidUrl(urlString) {
   }
 }
 
+async function validarDisponibilidad(fechaEntrada, fechaSalida) {
+    // Simulación: solo rechaza una fecha específica
+    if (fechaEntrada === '15/08/2025' && fechaSalida === '18/08/2025') {
+        return false;
+    }
+    return true;
+}
+
+const GRUPO_JID = '120363420483868468@g.us'; // Cambia por el JID real de tu grupo
+
+async function enviarAlGrupo(bot, texto) {
+    try {
+        await bot.sendMessage(GRUPO_JID, { text: texto });
+    } catch (error) {
+        console.error('Error enviando mensaje al grupo:', error);
+        try {
+            await bot.sendMessage(GRUPO_JID, { text: '⚠️ Ocurrió un error al enviar un mensaje al grupo.' });
+        } catch (err) {
+            console.error('Error enviando mensaje de error al grupo:', err);
+        }
+    }
+}
+
+async function reenviarComprobanteAlGrupo(bot, mensaje, datos) {
+    try {
+        if (mensaje.imageMessage) {
+            await bot.sendMessage(GRUPO_JID, { image: mensaje.imageMessage, caption: `Comprobante de ${datos.nombre}` });
+        } else if (mensaje.documentMessage) {
+            await bot.sendMessage(GRUPO_JID, { document: mensaje.documentMessage, caption: `Comprobante de ${datos.nombre}` });
+        }
+    } catch (error) {
+        console.error('Error reenviando comprobante al grupo:', error);
+        try {
+            await bot.sendMessage(GRUPO_JID, { text: '⚠️ Ocurrió un error al reenviar un comprobante al grupo.' });
+        } catch (err) {
+            console.error('Error enviando mensaje de error al grupo:', err);
+        }
+    }
+}
+
 module.exports = {
   isValidDate,
   confirmarReserva,
-  isValidUrl
+  isValidUrl,
+  validarDisponibilidad,
+  enviarAlGrupo,
+  reenviarComprobanteAlGrupo
 };

@@ -27,9 +27,9 @@ async function handleMainMenuOptions(bot, remitente, mensaje, establecerEstado) 
     case '2':
       try {
         await bot.sendMessage(remitente, {
-          text: `📅 *Reservar Ahora*:\nPor favor, indique el tipo de alojamiento que desea reservar.`
+          text: `📅 *Reservar Ahora*:\nPor favor, indica la fecha de entrada y salida con el formato DD/MM/AAAA - DD/MM/AAAA\nEjemplo: 20/08/2025 - 25/08/2025`
         });
-        await establecerEstado(remitente, 'reservar');
+        await establecerEstado(remitente, 'reservar_fechas');
       } catch (error) {
         console.error('Error enviando reservar ahora:', error);
       }

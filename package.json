@@ -12,7 +12,7 @@
   "dependencies": {
     "@bot-whatsapp/bot": "^0.1.38",
     "@bot-whatsapp/provider-baileys": "^0.1.0-alpha.18",
-    "@whiskeysockets/baileys": "^6.7.16",
+    "@whiskeysockets/baileys": "^6.7.18",
     "dotenv": "^16.5.0",
     "dropbox": "^10.34.0",
     "exceljs": "^4.4.0",
