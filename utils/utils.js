@@ -24,7 +24,22 @@ async function confirmarReserva(remitente, reserva) {
   // await bot.sendMessage(remitente, { text: 'Reserva confirmada. ¡Gracias!' });
 }
 
+/**
+ * Valida si una URL es válida.
+ * @param {string} urlString - La URL a validar.
+ * @returns {boolean} - True si la URL es válida, false en caso contrario.
+ */
+function isValidUrl(urlString) {
+  try {
+    new URL(urlString);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   isValidDate,
-  confirmarReserva
+  confirmarReserva,
+  isValidUrl
 };

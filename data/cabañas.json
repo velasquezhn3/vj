@@ -1,7 +1,7 @@
 [
   {
     "id": "cab1",
-    "nombre": "Cabaña Tortuga",
+    "nombre": "Cabaña Tortuga (3 Personas)",
     "tipo": "3 personas",
     "capacidad": 3,
     "habitaciones": 1,
@@ -14,8 +14,7 @@
       "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_5_tlyprh.jpg",
       "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_6_uhphdx.jpg",
       "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_7_n3lnio.jpg",
-      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_8_jmywru.jpg",
-      "https://res.cloudinary.com/dpajxjfyj/video/upload/v1751931186/WhatsApp_Video_2025-07-07_at_12.35.40_PM_xa3o2p.mp4"
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_8_jmywru.jpg"
     ],
     "precio_noche": 3500,
     "moneda": "HNL",
@@ -39,7 +38,7 @@
   },
   {
     "id": "cab2",
-    "nombre": "Cabaña Caracol",
+    "nombre": "Cabaña Caracol (6 Personas)",
     "tipo": "6 personas",
     "capacidad": 6,
     "habitaciones": 1,
@@ -53,8 +52,7 @@
       "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931156/WhatsApp_Image_2025-07-07_at_12.24.39_PM_1_ls6yhk.jpg",
       "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931156/WhatsApp_Image_2025-07-07_at_12.24.40_PM_kquth7.jpg",
       "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931159/WhatsApp_Image_2025-07-07_at_12.24.38_PM_rqpt8e.jpg",
-      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931155/WhatsApp_Image_2025-07-07_at_12.24.39_PM_l6owj0.jpg",
-      "https://res.cloudinary.com/dpajxjfyj/video/upload/v1751931186/WhatsApp_Video_2025-07-07_at_12.35.40_PM_xa3o2p.mp4"
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931155/WhatsApp_Image_2025-07-07_at_12.24.39_PM_l6owj0.jpg"
     ],
     "precio_noche": 3500,
     "moneda": "HNL",
@@ -78,7 +76,7 @@
   },
   {
     "id": "cab3",
-    "nombre": "Cabaña Tiburon",
+    "nombre": "Cabaña Tiburon (9 Personas)",
     "tipo": "8 personas",
     "capacidad": 8,
     "habitaciones": 1,
@@ -95,8 +93,7 @@
       "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927026/cab2_9_yswqw8.jpg",
       "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927026/cab2_14_enxl13.jpg",
       "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927026/cab2_6_gs2qem.jpg",
-      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927025/cab2_7_ipgpse.jpg",
-      "https://res.cloudinary.com/dpajxjfyj/video/upload/v1751931186/WhatsApp_Video_2025-07-07_at_12.35.40_PM_xa3o2p.mp4"
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927025/cab2_7_ipgpse.jpg"
     ],
     "precio_noche": 3500,
     "moneda": "HNL",
