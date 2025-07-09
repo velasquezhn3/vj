@@ -2,18 +2,20 @@
   {
     "id": "cab1",
     "nombre": "Cabaña Tortuga",
-    "tipo": "Premium",
+    "tipo": "3 personas",
     "capacidad": 3,
     "habitaciones": 1,
-    "baños": 2,
+    "baños": 1,
     "fotos": [
-      "https://i.ibb.co/Gvr9MKwZ/Whats-App-Image-2025-06-04-at-3-26-09-PM-3.jpg",
-      "https://i.ibb.co/N2W8HmDJ/Whats-App-Image-2025-06-04-at-3-26-10-PM-3.jpg",
-      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg",
-      "https://i.ibb.co/0jx1RWxp/Whats-App-Image-2025-06-04-at-3-26-07-PM.jpg",
-      "https://i.ibb.co/pvnSvQJX/Whats-App-Image-2025-06-04-at-3-26-08-PM-1.jpg",
-      "https://i.ibb.co/WWGj8PsT/Whats-App-Image-2025-06-04-at-3-26-08-PM-2.jpg",
-      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg"
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_1_pckc3x.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_2_ov26wn.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_3_q3wrdj.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_4_e9prqi.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_5_tlyprh.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_6_uhphdx.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_7_n3lnio.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_8_jmywru.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/video/upload/v1751931186/WhatsApp_Video_2025-07-07_at_12.35.40_PM_xa3o2p.mp4"
     ],
     "precio_noche": 3500,
     "moneda": "HNL",
@@ -32,23 +34,27 @@
         "fecha_fin": "2025-07-18",
         "estado": "confirmada"
       }
-    ]
+    ],
+    "descripcion": "Muchísimas gracias por tu interés en nuestros servicios en Villas Julie 🤗 podemos ofrecerle las siguientes opciones de alojamiento:\n\n1.- Cabaña Tortuga es una apartamento de 1 cuarto y 1 baño para un máximo de 3 personas.\n\nSera un placer atenderle en las bellas playas de Tela. 🏝En Villas Julie le ofrecemos un Apartamento de un cuarto 🏠 para un Máximo de 3 personas, ubicada a media cuadra de la mejor playa de Tela.\n\nEl Apartamento tiene las siguientes áreas:\n\nCUARTO\nCuenta con una cama matrimonial , una unipersonal, Aire Acondicionado y baño. 🛌 🛁\n\nCOCINETA\n🍳Cocineta pequeña  con Refrigeradora pequeña , Estufa de dos hornillas , Microondas, y accesorios básicos de Cocina\n\n🏊Área de Piscina y área social\nSON COMPARTIDAS CON OTROS HUESPEDES de las 6 cabañas del complejo, horario máximo para utilizar hasta las 9 p.m.\nPedimos por favor respetar el horario, debemos realizar el mantenimiento adecuado a las piscinas.\n\nPor seguridad NO se permite alimentos y bebidas en el área de la piscina.\n\n🍗Hay un pequeño asador de carne el cual con mucho gusto podemos prestarle, solo debe traer su carbón.\n\nCheck IN y Check OUT\nLa hora de Entrada es a la 2:00 p.m. y salida a las 11:00 a.m.\n\n👩‍💻Wifi\n\n🚗🚙 1 parqueo\n\nPROHIBICIONES\nNO se permite visitas.\n🚫NO se permiten mascotas 🐶\nNO llevar nuestras toallas a la playa.\n🚭No se permite fumar dentro de las cabañas.\nNo tener música a alto volumen después de las 11 p.m. por respeto a los otros huéspedes.\n\n📖Por favor leer todas las condiciones y estar de acuerdo con ellas para coordinar de la mejor manera su viaje 🤓"
   },
   {
     "id": "cab2",
     "nombre": "Cabaña Caracol",
-    "tipo": "Premium",
-    "capacidad": 3,
+    "tipo": "6 personas",
+    "capacidad": 6,
     "habitaciones": 1,
     "baños": 2,
     "fotos": [
-      "https://i.ibb.co/Gvr9MKwZ/Whats-App-Image-2025-06-04-at-3-26-09-PM-3.jpg",
-      "https://i.ibb.co/N2W8HmDJ/Whats-App-Image-2025-06-04-at-3-26-10-PM-3.jpg",
-      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg",
-      "https://i.ibb.co/0jx1RWxp/Whats-App-Image-2025-06-04-at-3-26-07-PM.jpg",
-      "https://i.ibb.co/pvnSvQJX/Whats-App-Image-2025-06-04-at-3-26-08-PM-1.jpg",
-      "https://i.ibb.co/WWGj8PsT/Whats-App-Image-2025-06-04-at-3-26-08-PM-2.jpg",
-      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg"
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931157/WhatsApp_Image_2025-07-07_at_12.24.40_PM_2_yfxzze.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931158/WhatsApp_Image_2025-07-07_at_12.24.41_PM_1_rgrpaf.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931157/WhatsApp_Image_2025-07-07_at_12.24.41_PM_ok5spo.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931156/WhatsApp_Image_2025-07-07_at_12.24.40_PM_1_d1grbl.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931156/WhatsApp_Image_2025-07-07_at_12.24.39_PM_2_eax1dt.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931156/WhatsApp_Image_2025-07-07_at_12.24.39_PM_1_ls6yhk.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931156/WhatsApp_Image_2025-07-07_at_12.24.40_PM_kquth7.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931159/WhatsApp_Image_2025-07-07_at_12.24.38_PM_rqpt8e.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931155/WhatsApp_Image_2025-07-07_at_12.24.39_PM_l6owj0.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/video/upload/v1751931186/WhatsApp_Video_2025-07-07_at_12.35.40_PM_xa3o2p.mp4"
     ],
     "precio_noche": 3500,
     "moneda": "HNL",
@@ -67,23 +73,30 @@
         "fecha_fin": "2025-07-18",
         "estado": "confirmada"
       }
-    ]
+    ],
+    "descripcion": "Sera un placer atenderle en las bellas playas de Tela. 🏝En Villas Julie le ofrecemos una cabaña  de dos cuartos y dos baños 🏠 para un Máximo de 6 personas, ubicada a media cuadra de la mejor playa de Tela.\n\nLa cabaña tiene las siguientes áreas:\n\nCUARTOS\nCuarto#1 (Principal) con una cama matrimonial , una unipersonal, Aire Acondicionado y baño. 🛌 🛁\nCuarto # 2 con una cama matrimonial, una unipersonal, aire acondicionado y baño compartido.\n\nCOCINA\n🍳Cocina completa con Refrigeradora, Estufa, Microondas, Cafetera, licuadora y accesorios básicos de Cocina\n\n📺Sala con TV con cable.\n\n🏊Área de Piscina y área social\nSON COMPARTIDAS CON OTROS HUESPEDES de las 6 cabañas del complejo, horario máximo para utilizar hasta las 9 p.m.\nPedimos por favor respetar el horario, debemos realizar el mantenimiento adecuado a las piscinas.\n\nPor seguridad NO se permite alimentos y bebidas en el área de la piscina.\n\n🍗Hay un pequeño asador de carne el cual con mucho gusto podemos prestarle, solo debe traer su carbón.\n\nCheck IN y Check OUT\nLa hora de Entrada es a la 2:00 p.m. y salida a las 11:00 a.m.\n\n👩‍💻Wifi\n\n🚗🚙 2 parqueos\n\nPROHIBICIONES\nNO se permite visitas.\n🚫NO se permiten mascotas 🐶\nNO llevar nuestras toallas a la playa.\n🚭No se permite fumar dentro de las cabañas.\nNo tener música a alto volumen después de las 11 p.m. por respeto a los otros huéspedes.\n\n📖Por favor leer todas las condiciones y estar de acuerdo con ellas para coordinar de la mejor manera su viaje 🤓"
   },
   {
     "id": "cab3",
-    "nombre": "Cabaña Delfín",
-    "tipo": "Premium",
-    "capacidad": 3,
+    "nombre": "Cabaña Tiburon",
+    "tipo": "8 personas",
+    "capacidad": 8,
     "habitaciones": 1,
     "baños": 2,
     "fotos": [
-      "https://i.ibb.co/Gvr9MKwZ/Whats-App-Image-2025-06-04-at-3-26-09-PM-3.jpg",
-      "https://i.ibb.co/N2W8HmDJ/Whats-App-Image-2025-06-04-at-3-26-10-PM-3.jpg",
-      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg",
-      "https://i.ibb.co/0jx1RWxp/Whats-App-Image-2025-06-04-at-3-26-07-PM.jpg",
-      "https://i.ibb.co/pvnSvQJX/Whats-App-Image-2025-06-04-at-3-26-08-PM-1.jpg",
-      "https://i.ibb.co/WWGj8PsT/Whats-App-Image-2025-06-04-at-3-26-08-PM-2.jpg",
-      "https://i.ibb.co/Z9RRTrV/Whats-App-Image-2025-06-04-at-3-26-10-PM-1.jpg"
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927030/cab2_11_pfog3z.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927030/cab2_4_dyt1oo.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927030/cab2_3_tvwtpn.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927029/cab2_2_upds85.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927027/cab2_15_hhptmc.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927027/cab2_13_yvnucn.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927026/cab2_10_qvlk6m.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927026/cab2_12_ufudms.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927026/cab2_9_yswqw8.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927026/cab2_14_enxl13.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927026/cab2_6_gs2qem.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927025/cab2_7_ipgpse.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/video/upload/v1751931186/WhatsApp_Video_2025-07-07_at_12.35.40_PM_xa3o2p.mp4"
     ],
     "precio_noche": 3500,
     "moneda": "HNL",
@@ -102,6 +115,7 @@
         "fecha_fin": "2025-07-18",
         "estado": "confirmada"
       }
-    ]
+    ],
+    "descripcion": "Muchísimas gracias por tu interés por nuestros servicios en Villas Julie 🤗\n\nSera un placer atenderle en las bellas playas de Tela. 🏝En Villas Julie le ofrecemos una cabaña 🏠Ubicada a media cuadra de la mejor playa de Tela.\n\nEstá cabaña tiene tres cuartos y dos baños , para un MAXIMO de 8 personas.\n\nLa cabaña tiene las siguientes áreas:\n\nCUARTOS\nCuarto#1 (Principal) con una cama matrimonial , una unipersonal, Aire Acondicionado y baño. 🛌 🛁\nCuarto # 2 con una cama matrimonial, una unipersonal, aire acondicionado y baño compartido.\nCuarto #3 con dos camas unipersonales, aire acondicionado y baño compartido.\n\nCOCINA\n🍳Cocina completa con Refrigeradora, Estufa, Microondas, Cafetera, licuadora y accesorios básicos de Cocina\n\n📺Sala con TV con cable\n\n🏊Área de Piscina y área social\nSON COMPARTIDAS CON OTROS HUESPEDES de las 6 cabañas del complejo, horario máximo para utilizar hasta las 9 p.m.\nPedimos por favor respetar el horario, debemos realizar el mantenimiento adecuado a las piscinas.\nPor seguridad NO se permite alimentos y bebidas en el área de la piscina.\n\n🍗Hay un pequeño asador de carne el cual con mucho gusto podemos prestarle, solo debe traer su carbón.\n\nCheck IN y Check OUT\nLa hora de Entrada es a la 2:00 p.m. y salida a las 11:00 a.m.\n\n👩‍💻Wifi\n\n🚗🚙 2 parqueos\n\nPROHIBICIONES\nNO se permite visitas.\n🚫NO se permiten mascotas 🐶\nNO llevar nuestras toallas a la playa.\n🚭No se permite fumar dentro de las cabañas.\nNo tener música a alto volumen después de las 11 p.m. por respeto a los otros huéspedes.\n\n📖Por favor leer todas las condiciones y estar de acuerdo con ellas para coordinar de la mejor manera su viaje 🤓"
   }
 ]

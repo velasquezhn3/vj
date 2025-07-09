@@ -1,252 +1,340 @@
 /**
- * Módulo para el procesamiento de mensajes y flujo de conversación del bot con manejo mejorado de errores.
+ * Módulo profesional con logger para producción
  */
 
 const { establecerEstado, obtenerEstado, establecerUltimoSaludo, obtenerUltimoSaludo } = require('../services/stateService');
-const weatherService = require('../services/weatherService');
-const { isValidDate, confirmarReserva } = require('../utils/utils');
 const constants = require('./constants');
-const { flowAlojamientos } = require('../routes/alojamientos');
 const { handleMainMenuOptions } = require('../controllers/mainMenuHandler');
-const { manejarNoReserva } = require('../routes/postReservaHandler');
+const { exportarReservasAExcel } = require('../services/reservaExportService');
+const path = require('path');
+const logger = require('../config/logger'); // Logger profesional
 
-/**
- * Envía el menú principal al usuario.
- * @param {Object} bot - Instancia del bot.
- * @param {string} remitente - Número del usuario.
- */
+// Función segura para cargar datos de cabañas
+async function cargarCabanas() {
+    try {
+        const cabanasPath = path.resolve(__dirname, '../data/cabañas.json');
+        delete require.cache[require.resolve(cabanasPath)];
+        const data = require(cabanasPath);
+        
+        if (!Array.isArray(data)) {
+            throw new Error('Formato inválido de cabañas: no es un array');
+        }
+        
+        return data;
+    } catch (error) {
+        logger.error(`Error cargando cabañas: ${error.message}`, {
+            stack: error.stack,
+            module: 'cargarCabanas'
+        });
+        throw new Error('Error al cargar información de cabañas');
+    }
+}
+
 async function enviarMenuPrincipal(bot, remitente) {
-  try {
-    await establecerEstado(remitente, 'main');
-    await bot.sendMessage(remitente, { text: constants.MENU_PRINCIPAL });
-  } catch (error) {
-    console.error('Error enviando menú principal:', error);
-  }
+    try {
+        await establecerEstado(remitente, 'MENU_PRINCIPAL');
+        await bot.sendMessage(remitente, { text: constants.MENU_PRINCIPAL });
+        logger.info(`Menú principal enviado a ${remitente}`);
+    } catch (error) {
+        logger.error(`Error enviando menú principal a ${remitente}: ${error.message}`, {
+            stack: error.stack,
+            userId: remitente
+        });
+        
+        try {
+            await bot.sendMessage(remitente, { 
+                text: '⚠️ No pude cargar el menú principal. Por favor intenta más tarde.' 
+            });
+        } catch (fallbackError) {
+            logger.critical(`Error crítico de comunicación con ${remitente}: ${fallbackError.message}`, {
+                stack: fallbackError.stack,
+                userId: remitente
+            });
+        }
+    }
 }
 
-/**
- * Procesa los mensajes recibidos y maneja la lógica de conversación con manejo de errores.
- * @param {Object} bot - Instancia del bot.
- * @param {string} remitente - Número del usuario.
- * @param {string} mensaje - Texto del mensaje recibido.
- */
+async function enviarMenuCabanas(bot, remitente) {
+    try {
+        const cabañas = await cargarCabanas();
+        
+        if (cabañas.length === 0) {
+            await bot.sendMessage(remitente, { text: '⚠️ No hay cabañas disponibles en este momento.' });
+            await enviarMenuPrincipal(bot, remitente);
+            return;
+        }
+        
+        await establecerEstado(remitente, 'LISTA_CABAÑAS');
+        
+        const menuCabanas = `🌴 Cabañas Disponibles:\n` +
+            cabañas.map((cabaña, index) => `${index + 1}. ${cabaña.nombre || 'Cabaña sin nombre'}`).join('\n') +
+            `\n0. Volver ↩️\nPor favor, selecciona el número de la cabaña para ver más detalles.`;
+        
+        await bot.sendMessage(remitente, { text: menuCabanas });
+        logger.info(`Menú cabañas enviado a ${remitente}`);
+        
+    } catch (error) {
+        logger.error(`Error enviando menú de cabañas a ${remitente}: ${error.message}`, {
+            stack: error.stack,
+            userId: remitente
+        });
+        
+        try {
+            await bot.sendMessage(remitente, { 
+                text: '⚠️ No pude cargar la lista de cabañas. Por favor intenta más tarde.' 
+            });
+            await enviarMenuPrincipal(bot, remitente);
+        } catch (fallbackError) {
+            logger.critical(`Error de comunicación con ${remitente}: ${fallbackError.message}`, {
+                stack: fallbackError.stack,
+                userId: remitente
+            });
+        }
+    }
+}
+
+async function enviarDetalleCabaña(bot, remitente, seleccion) {
+    try {
+        const cabañas = await cargarCabanas();
+        
+        const seleccionNum = parseInt(seleccion);
+        if (isNaN(seleccionNum) || seleccionNum < 1 || seleccionNum > cabañas.length) {
+            await bot.sendMessage(remitente, { text: '⚠️ Selección inválida. Por favor, ingresa un número válido del menú.' });
+            await enviarMenuCabanas(bot, remitente);
+            return;
+        }
+        
+        const cabaña = cabañas[seleccionNum - 1];
+        if (!cabaña || typeof cabaña !== 'object') {
+            throw new Error('Cabaña seleccionada no válida');
+        }
+        
+        await establecerEstado(remitente, 'DETALLE_CABAÑA', { seleccion: seleccionNum });
+        
+        const nombre = cabaña.nombre || 'Cabaña sin nombre';
+        const tipo = cabaña.tipo || 'Tipo no especificado';
+        const descripcion = cabaña.descripcion || 'Descripción no disponible';
+        
+        let detalles = `🏖️ *${nombre}* (${tipo})\n\n${descripcion}\n\n`;
+        detalles += `🔄 ¿Siguiente paso?\n1. ← Ver todas las cabañas\n2. Reservar esta cabaña\n0. Menú principal 🏠`;
+        
+        try {
+            const medios = cabaña.fotos || [];
+            const urlsValidas = medios.filter(url => {
+                try {
+                    new URL(url);
+                    return true;
+                } catch {
+                    logger.warn(`URL inválida en cabaña ${nombre}: ${url}`);
+                    return false;
+                }
+            });
+
+            const imageUrls = urlsValidas.filter(url => /\.(jpg|jpeg|png|gif|webp)$/i.test(url));
+            const videoUrls = urlsValidas.filter(url => /\.(mp4|mov|avi|mkv)$/i.test(url));
+
+            if (imageUrls.length > 0) {
+                await bot.sendMessage(remitente, {
+                    image: { url: imageUrls[0] },
+                    caption: detalles
+                });
+                
+                for (let i = 1; i < imageUrls.length; i++) {
+                    await bot.sendMessage(remitente, {
+                        image: { url: imageUrls[i] }
+                    });
+                }
+            } else {
+                await bot.sendMessage(remitente, { text: detalles });
+            }
+
+            for (const videoUrl of videoUrls) {
+                try {
+                    await bot.sendMessage(remitente, {
+                        video: { url: videoUrl }
+                    });
+                } catch (videoError) {
+                    logger.warn(`Error enviando video a ${remitente}: ${videoError.message}`, {
+                        url: videoUrl
+                    });
+                }
+            }
+            
+            await bot.sendMessage(remitente, { 
+                text: 'Selecciona:\n1: Ver más alojamientos\n0: Menú principal\n2: Reservar esta cabaña'
+            });
+            
+            logger.info(`Detalles de cabaña enviados a ${remitente}: ${nombre}`);
+            
+        } catch (mediaError) {
+            logger.error(`Error enviando medios a ${remitente}: ${mediaError.message}`, {
+                stack: mediaError.stack,
+                userId: remitente
+            });
+            
+            await bot.sendMessage(remitente, { text: detalles });
+            await bot.sendMessage(remitente, { 
+                text: 'Selecciona:\n1: Ver más alojamientos\n0: Menú principal\n2: Reservar esta cabaña'
+            });
+        }
+        
+    } catch (error) {
+        logger.error(`Error enviando detalles de cabaña a ${remitente}: ${error.message}`, {
+            stack: error.stack,
+            userId: remitente,
+            seleccion
+        });
+        
+        try {
+            await bot.sendMessage(remitente, { 
+                text: '⚠️ No pude cargar los detalles de la cabaña. Por favor intenta seleccionar otra.' 
+            });
+            await enviarMenuCabanas(bot, remitente);
+        } catch (fallbackError) {
+            logger.critical(`Error de comunicación con ${remitente}: ${fallbackError.message}`, {
+                stack: fallbackError.stack,
+                userId: remitente
+            });
+        }
+    }
+}
+
 async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
-  const estado = obtenerEstado(remitente);
-  const textoMinuscula = mensaje.toLowerCase();
-
-  // Check if greeting was sent today
-  const hoy = new Date().toISOString().slice(0, 10);
-  const ultimoSaludo = obtenerUltimoSaludo(remitente);
-  let esPrimerMensajeDelDia = false;
-
-  if (ultimoSaludo !== hoy) {
-    esPrimerMensajeDelDia = true;
-    await establecerUltimoSaludo(remitente, hoy);
-    const saludo = `🌴 ¡Bienvenido(a) a Villas Julie! 🏖️ .Tu rincón ideal frente al mar te espera.`;
-    try {
-      await bot.sendMessage(remitente, { text: saludo });
-    } catch (error) {
-      console.error('Error enviando saludo:', error);
+    if (!remitente || typeof remitente !== 'string' || remitente.trim() === '') {
+        logger.error('Remitente inválido en procesarMensaje', {
+            mensaje,
+            mensajeObj
+        });
+        return;
     }
-    // Set state to MENU_PRINCIPAL after greeting
-    await establecerEstado(remitente, 'MENU_PRINCIPAL');
+
+    const mensajeTexto = mensaje || '';
+    const textoMinuscula = mensajeTexto.toLowerCase().trim();
+
     try {
-      await enviarMenuPrincipal(bot, remitente);
-    } catch (error) {
-      console.error('Error enviando menú principal:', error);
-    }
-    return;
-  }
+        const hoy = new Date().toISOString().slice(0, 10);
+        const ultimoSaludo = obtenerUltimoSaludo(remitente) || '';
+        
+        if (ultimoSaludo !== hoy) {
+            await establecerUltimoSaludo(remitente, hoy);
+            const saludo = `🌴 ¡Bienvenido(a) a Villas Julie! 🏖️ Tu rincón ideal frente al mar te espera.`;
+            
+            try {
+                await bot.sendMessage(remitente, { text: saludo });
+            } catch (saludoError) {
+                logger.warn(`Error enviando saludo a ${remitente}: ${saludoError.message}`, {
+                    userId: remitente
+                });
+            }
+            
+            await enviarMenuPrincipal(bot, remitente);
+            return;
+        }
 
-  if (textoMinuscula === 'menu' || textoMinuscula === 'menú') {
-    try {
-      await enviarMenuPrincipal(bot, remitente);
-    } catch (error) {
-      console.error('Error enviando menú principal:', error);
-    }
-    return;
-  }
+        if (textoMinuscula === 'menu' || textoMinuscula === 'menú') {
+            await enviarMenuPrincipal(bot, remitente);
+            return;
+        }
 
-const { handleShareExperienceResponse } = require('../routes/shareExperience');
-
+        const estado = obtenerEstado(remitente) || { estado: 'MENU_PRINCIPAL' };
+        logger.debug(`Procesando mensaje de ${remitente}: ${mensajeTexto}`, {
+            estado: estado.estado
+        });
+        
 switch (estado.estado) {
-  case 'main':
-    await handleMainMenuOptions(bot, remitente, mensaje, establecerEstado);
-    break;
+      case 'MENU_PRINCIPAL':
+                if (mensajeTexto.trim() === '1') {
+                    // Mostrar menú de alojamientos directamente
+                    await enviarMenuCabanas(bot, remitente);
+                } else if (mensajeTexto.trim() === 'exportar reservas') {
+                    try {
+                        const rutaArchivo = await exportarReservasAExcel();
+                        await bot.sendMessage(remitente, { text: `Reservas exportadas exitosamente. Archivo guardado en: ${rutaArchivo}` });
+                    } catch (error) {
+                        await bot.sendMessage(remitente, { text: 'Error al exportar las reservas. Por favor intenta más tarde.' });
+                    }
+                } else {
+                    await handleMainMenuOptions(bot, remitente, mensajeTexto.trim(), establecerEstado);
+                }
+                break;
 
-  case 'experienciasLocales':
-    const { handleExperienciasLocales } = require('./flows/experienciasLocales');
-    await handleExperienciasLocales(bot, remitente, mensaje, establecerEstado);
-    break;
+            case 'LISTA_CABAÑAS':
+                if (mensajeTexto.trim() === '0') {
+                    await enviarMenuPrincipal(bot, remitente);
+                } else {
+                    const seleccion = parseInt(mensajeTexto.trim());
+                    if (isNaN(seleccion)) {
+                        await bot.sendMessage(remitente, { 
+                            text: '⚠️ Por favor ingresa solo el número de la cabaña que deseas ver.' 
+                        });
+                        await enviarMenuCabanas(bot, remitente);
+                    } else {
+                        await enviarDetalleCabaña(bot, remitente, seleccion);
+                    }
+                }
+                break;
 
-  case 'share_experience':
-    await handleShareExperienceResponse(bot, remitente, mensaje, establecerEstado);
-    break;
+            case 'DETALLE_CABAÑA':
+                switch (mensajeTexto.trim().toLowerCase()) {
+                    case '1':
+                        await enviarMenuCabanas(bot, remitente);
+                        break;
+                    case '2':
+                        await bot.sendMessage(remitente, { 
+                            text: 'Funcionalidad de reserva aún no implementada. Serás redirigido al menú principal.' 
+                        });
+                        await enviarMenuPrincipal(bot, remitente);
+                        break;
+                    case '0':
+                        await enviarMenuPrincipal(bot, remitente);
+                        break;
+                    default:
+                        await bot.sendMessage(remitente, { 
+                            text: '⚠️ Opción no reconocida. Por favor selecciona una opción válida.' 
+                        });
+                        if (estado.datos && estado.datos.seleccion) {
+                            await enviarDetalleCabaña(bot, remitente, estado.datos.seleccion);
+                        } else {
+                            await enviarMenuCabanas(bot, remitente);
+                        }
+                        break;
+                }
+                break;
 
-  case 'alojamientos':
-    try {
-      const cabañas = require('../data/cabañas.json');
-      const seleccion = parseInt(mensaje.trim());
-      if (isNaN(seleccion) || seleccion < 1 || seleccion > cabañas.length) {
-        await bot.sendMessage(remitente, { text: '⚠️ Selección inválida. Por favor, ingresa un número válido del menú.' });
-        break;
-      }
-      const cabaña = cabañas[seleccion - 1];
-      let detalles = `🏖️ *${cabaña.nombre}* (${cabaña.tipo})\n`;
-      detalles += `👥 Capacidad: ${cabaña.capacidad} personas\n`;
-      detalles += `🛏️ Habitaciones: ${cabaña.habitaciones} | 🚿 Baños: ${cabaña.baños}\n`;
-      detalles += `💰 Precio por noche: ${cabaña.precio_noche.toLocaleString()} ${cabaña.moneda}\n`;
-      detalles += `📍 Ubicación: ${cabaña.ubicacion.ciudad}, ${cabaña.ubicacion.departamento}\n\n`;
-      detalles += `🛋️ Comodidades:\n`;
-      cabaña.comodidades.forEach(item => {
-        detalles += `- ${item}\n`;
-      });
-      if (cabaña.reservas && cabaña.reservas.length > 0) {
-        detalles += `\n📅 Fechas reservadas:\n`;
-        cabaña.reservas.forEach(reserva => {
-          detalles += `- ${reserva.fecha_inicio} a ${reserva.fecha_fin} (${reserva.estado})\n`;
-        });
-      }
-      // Send first photo as image with caption
-      if (cabaña.fotos && cabaña.fotos.length > 0) {
-        await bot.sendMessage(remitente, {
-          image: { url: cabaña.fotos[0] },
-          caption: detalles
-        });
-        // Send remaining photos as separate image messages
-        for (let i = 1; i < cabaña.fotos.length; i++) {
-          await bot.sendMessage(remitente, {
-            image: { url: cabaña.fotos[i] }
-          });
+            default:
+                logger.warn(`Estado no manejado: ${estado.estado}`, {
+                    userId: remitente
+                });
+                
+                await bot.sendMessage(remitente, { 
+                    text: '⚠️ Ocurrió un error inesperado. Reiniciando tu sesión...' 
+                });
+                await enviarMenuPrincipal(bot, remitente);
+                break;
         }
-      } else {
-        // If no photos, send text only
-        await bot.sendMessage(remitente, { text: detalles });
-      }
     } catch (error) {
-      console.error('Error enviando detalles de cabaña:', error);
-    }
-    break;
-  case 'actividades':
-    try {
-      const { sendActividadDetails } = require('../controllers/actividadesController');
-      const seleccion = parseInt(mensaje.trim());
-      await sendActividadDetails(bot, remitente, seleccion);
-    } catch (error) {
-      console.error('Error enviando detalles de actividad:', error);
-    }
-    break;
-
-  case 'reservar':
-    if (!estado.tempReserva) estado.tempReserva = {};
-
-    if (!estado.tempReserva.tipo) {
-      estado.tempReserva.tipo = mensaje;
-      try {
-        await bot.sendMessage(remitente, {
-          text: '📅 Ingresa fechas (Formato: DD/MM - DD/MM)\nEj: 25/12 - 30/12'
+        logger.error(`Error crítico en procesarMensaje para ${remitente}: ${error.message}`, {
+            stack: error.stack,
+            userId: remitente,
+            mensaje
         });
-        await establecerEstado(remitente, 'reserva_paso2', estado.tempReserva);
-      } catch (error) {
-        console.error('Error enviando solicitud de fechas:', error);
-      }
-    }
-    break;
-
-  case 'reserva_paso2':
-    if (isValidDate(mensaje)) {
-      if (!estado.tempReserva) estado.tempReserva = {};
-      estado.tempReserva.fechaInicio = mensaje.split('-')[0].trim();
-      estado.tempReserva.fechaFin = mensaje.split('-')[1].trim();
-      try {
-        await bot.sendMessage(remitente, {
-          text: '👥 ¿Cuántas personas serán?'
-        });
-        await establecerEstado(remitente, 'reserva_paso3', estado.tempReserva);
-      } catch (error) {
-        console.error('Error enviando solicitud de número de personas:', error);
-      }
-    } else {
-      try {
-        await bot.sendMessage(remitente, { text: 'Formato de fecha no válido. Por favor, intente de nuevo.' });
-      } catch (error) {
-        console.error('Error enviando mensaje de formato de fecha inválido:', error);
-      }
-    }
-    break;
-
-  case 'reserva_paso3':
-    if (!isNaN(Number(mensaje))) {
-      estado.tempReserva.personas = Number(mensaje);
-      try {
-        await confirmarReserva(remitente, estado.tempReserva);
-        await establecerEstado(remitente, 'main');
-      } catch (error) {
-        console.error('Error confirmando reserva:', error);
-      }
-    } else {
-      try {
-        await bot.sendMessage(remitente, { text: 'Número no válido. Por favor, ingrese un número.' });
-      } catch (error) {
-        console.error('Error enviando mensaje de número inválido:', error);
-      }
-    }
-    break;
-
-  case 'MENU_PRINCIPAL':
-    switch (mensaje) {
-      case '1':
+        
         try {
-          await bot.sendMessage(remitente, { text: 'Por favor, envíe su información para validar.' });
-          await establecerEstado(remitente, 'VALIDACION_USUARIO');
-        } catch (error) {
-          console.error('Error enviando solicitud de validación de usuario:', error);
+            await bot.sendMessage(remitente, { 
+                text: '⚠️ Ocurrió un error procesando tu solicitud. Por favor intenta de nuevo más tarde.' 
+            });
+            await establecerEstado(remitente, 'MENU_PRINCIPAL');
+            await bot.sendMessage(remitente, { text: constants.MENU_PRINCIPAL });
+        } catch (fallbackError) {
+            logger.critical(`Error de comunicación crítico con ${remitente}: ${fallbackError.message}`, {
+                stack: fallbackError.stack,
+                userId: remitente
+            });
         }
-        break;
-      case '2':
-        try {
-          await bot.sendMessage(remitente, { text: 'Opción de validación alternativa seleccionada.' });
-          await establecerEstado(remitente, 'VALIDACION_ALTERNATIVA');
-        } catch (error) {
-          console.error('Error enviando opción de validación alternativa:', error);
-        }
-        break;
-      case '3':
-        try {
-          await bot.sendMessage(remitente, { text: '🌴 ¡Bienvenido(a) a Villas Yulie! 🏖️ .Tu rincón ideal frente al mar te espera.' });
-          await establecerEstado(remitente, 'FIN');
-        } catch (error) {
-          console.error('Error enviando mensaje de despedida:', error);
-        }
-        break;
-      default:
-        if (!esPrimerMensajeDelDia) {
-          try {
-            await bot.sendMessage(remitente, { text: 'Opción no válida. Por favor seleccione una opción del menú.' });
-          } catch (error) {
-            console.error('Error enviando opción no válida en menú principal:', error);
-          }
-        }
-        try {
-          await enviarMenuPrincipal(bot, remitente);
-        } catch (error) {
-          console.error('Error enviando menú principal:', error);
-        }
-        break;
     }
-    break;
-  // Additional states for validation can be added here
-  default:
-    try {
-      await enviarMenuPrincipal(bot, remitente);
-    } catch (error) {
-      console.error('Error enviando menú principal en estado por defecto:', error);
-    }
-    break;
-}
 }
 
 module.exports = {
-  enviarMenuPrincipal,
-  procesarMensaje
+    enviarMenuPrincipal,
+    procesarMensaje
 };

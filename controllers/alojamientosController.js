@@ -1,4 +1,6 @@
 const { loadCabañas, safeSave } = require('../services/alojamientosService');
+const path = require('path');
+const fs = require('fs');
 
 const flowAlojamientosHandler = async (ctx, { provider, flowDynamic, state, endFlow }) => {
   const cabañas = loadCabañas();
@@ -29,6 +31,9 @@ const flowAlojamientosHandler = async (ctx, { provider, flowDynamic, state, endF
   cabaña.comodidades.forEach(item => {
     detalles += `- ${item}\\n`;
   });
+  if (cabaña.descripcion) {
+    detalles += `\\n📖 Descripción:\\n${cabaña.descripcion}\\n`;
+  }
   if (cabaña.reservas && cabaña.reservas.length > 0) {
     detalles += `\\n📅 Fechas reservadas:\\n`;
     cabaña.reservas.forEach(reserva => {
@@ -60,6 +65,9 @@ async function sendAlojamientoDetails(bot, remitente, seleccion) {
   cabaña.comodidades.forEach(item => {
     detalles += `- ${item}\n`;
   });
+  if (cabaña.descripcion) {
+    detalles += `\n📖 Descripción:\n${cabaña.descripcion}\n`;
+  }
   if (cabaña.reservas && cabaña.reservas.length > 0) {
     detalles += `\n📅 Fechas reservadas:\n`;
     cabaña.reservas.forEach(reserva => {
@@ -67,14 +75,21 @@ async function sendAlojamientoDetails(bot, remitente, seleccion) {
     });
   }
   if (cabaña.fotos && cabaña.fotos.length > 0) {
-    await bot.sendMessage(remitente, {
-      image: { url: cabaña.fotos[0] },
-      caption: detalles
-    });
-    for (let i = 1; i < cabaña.fotos.length; i++) {
+    try {
+      // Send first photo as image with caption
       await bot.sendMessage(remitente, {
-        image: { url: cabaña.fotos[i] }
+        image: { url: cabaña.fotos[0] },
+        caption: detalles
       });
+      // Send remaining photos as separate image messages
+      for (let i = 1; i < cabaña.fotos.length; i++) {
+        await bot.sendMessage(remitente, {
+          image: { url: cabaña.fotos[i] }
+        });
+      }
+    } catch (error) {
+      console.error('Error enviando detalles de cabaña:', error);
+      await bot.sendMessage(remitente, { text: detalles });
     }
   } else {
     await bot.sendMessage(remitente, { text: detalles });
