@@ -78,6 +78,16 @@ async function iniciarBot(procesarMensajeCallback) {
       }
     });
 
+    // Add event to handle auth state updates and save credentials
+    bot.ev.on('creds.update', async () => {
+      try {
+        await saveCreds();
+        console.log('Credentials updated and saved successfully.');
+      } catch (error) {
+        console.error('Error saving credentials:', error);
+      }
+    });
+
     bot.ev.on('creds.update', saveCreds);
 
     bot.ev.on('messages.upsert', async ({ messages }) => {

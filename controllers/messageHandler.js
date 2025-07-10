@@ -161,9 +161,39 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
                 await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { ...datos, telefono: mensajeTexto });
                 return;
 
-            case ESTADOS_RESERVA.PERSONAS:
-                await bot.sendMessage(remitente, { text: '¿Qué alojamiento deseas? (Ejemplo: Cabaña 1, Cabaña 2...)' });
-                await establecerEstado(remitente, ESTADOS_RESERVA.ALOJAMIENTO, { ...datos, personas: mensajeTexto });
+case ESTADOS_RESERVA.PERSONAS:
+                const cantidad = parseInt(mensajeTexto.trim());
+
+                if (isNaN(cantidad) || cantidad < 1) {
+                    await bot.sendMessage(remitente, { text: 'Por favor, ingresa una cantidad válida de personas (número mayor a 0).' });
+                    return;
+                }
+
+                let alojamiento = '';
+                if (cantidad <= 3) {
+                    alojamiento = 'Cabaña Tortuga';
+                } else if (cantidad <= 6) {
+                    alojamiento = 'Cabaña Caracol';
+                } else if (cantidad <= 9) {
+                    alojamiento = 'Cabaña Tiburón';
+                } else {
+                    await bot.sendMessage(remitente, {
+                        text: `La cantidad ingresada (${cantidad}) excede la capacidad máxima por cabaña (9 personas). Te sugerimos alquilar más de una cabaña.`
+                    });
+                    return;
+                }
+
+                await bot.sendMessage(remitente, {
+                    text: `Perfecto. Se asignó automáticamente *${alojamiento}* para ${cantidad} persona(s).`
+                });
+
+                await bot.sendMessage(remitente, { text: '¿Leíste y aceptas las condiciones de uso? (responde sí/no)' });
+
+                await establecerEstado(remitente, ESTADOS_RESERVA.CONDICIONES, {
+                    ...datos,
+                    personas: cantidad,
+                    alojamiento
+                });
                 return;
 
             case ESTADOS_RESERVA.ALOJAMIENTO:
@@ -231,10 +261,17 @@ Fechas: ${datos.fechaEntrada} - ${datos.fechaSalida}`;
             await establecerEstado(remitente, 'MENU_PRINCIPAL');
             await bot.sendMessage(remitente, { text: constants.MENU_PRINCIPAL });
         } catch (fallbackError) {
-            logger.error(`Error de comunicación crítico con ${remitente}: ${fallbackError.message}`, {
-                stack: fallbackError.stack,
-                userId: remitente
-            });
+            if (typeof logger.critical === 'function') {
+                logger.critical(`Error de comunicación crítico con ${remitente}: ${fallbackError.message}`, {
+                    stack: fallbackError.stack,
+                    userId: remitente
+                });
+            } else {
+                logger.error(`Error de comunicación crítico con ${remitente}: ${fallbackError.message}`, {
+                    stack: fallbackError.stack,
+                    userId: remitente
+                });
+            }
         }
     }
 }
