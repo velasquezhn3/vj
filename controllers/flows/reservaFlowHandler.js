@@ -2,6 +2,7 @@ const { establecerEstado } = require('../../services/stateService');
 const { calcularPrecioTotal } = require('../../services/reservaPriceService');
 const { enviarAlGrupo, reenviarComprobanteAlGrupo } = require('../../utils/utils');
 const { ESTADOS_RESERVA } = require('../reservaConstants');
+const usersService = require('../../services/usersService');
 
 async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje) {
     switch (estado) {
@@ -118,7 +119,42 @@ Noches: ${datos.noches}
 Total a pagar: $${datos.precioTotal}`;
 
                 await enviarAlGrupo(bot, resumen);
-                await bot.sendMessage(remitente, { text: 'Para confirmar tu reserva, debes hacer un depósito del 50%. Tienes 24h para enviar el comprobante.' });
+
+                // Save reservation to DB
+                console.log('Intentando obtener usuario por teléfono:', datos.telefono);
+                let user = await usersService.getUserByPhone(datos.telefono);
+                console.log('Usuario obtenido:', user);
+                if (!user) {
+                  console.log('Usuario no encontrado, creando nuevo usuario...');
+                  const userId = await usersService.createUser({ phone_number: datos.telefono, name: datos.nombre });
+                  console.log('Nuevo usuario creado con ID:', userId);
+                  user = { user_id: userId, phone_number: datos.telefono, name: datos.nombre };
+                }
+                const userId = user.user_id;
+                console.log('Usando userId para reserva:', userId, 'Tipo:', typeof userId);
+
+                const cabinIdMap = {
+                  'Cabaña Tortuga': 1,
+                  'Cabaña Caracol': 2,
+                  'Cabaña Tiburón': 3
+                };
+                const cabinId = cabinIdMap[datos.alojamiento] || 1;
+
+                const reservaData = {
+                  start_date: datos.fechaEntrada,
+                  end_date: datos.fechaSalida,
+                  status: 'pendiente',
+                  total_price: datos.precioTotal
+                };
+
+                const success = await require('../../services/alojamientosService').addReserva(cabinId, userId, reservaData);
+                console.log('Resultado de guardar reserva:', success);
+                if (success) {
+                  await bot.sendMessage(remitente, { text: 'Tu reserva ha sido guardada correctamente. Para confirmar, debes hacer un depósito del 50%. Tienes 24h para enviar el comprobante.' });
+                } else {
+                  await bot.sendMessage(remitente, { text: 'Hubo un error guardando tu reserva. Por favor intenta nuevamente más tarde.' });
+                }
+
                 await establecerEstado(remitente, ESTADOS_RESERVA.ESPERANDO_PAGO, { ...datos, condiciones: mensajeTexto });
             } else {
                 await bot.sendMessage(remitente, { text: 'Debes aceptar las condiciones para continuar.' });

@@ -36,6 +36,8 @@ jspm_packages/
 package-lock.json
 yarn.lock
 
+# Ignore admin-frontend node_modules and build
+
 # Others
 *.tgz
 *.gz

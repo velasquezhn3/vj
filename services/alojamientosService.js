@@ -1,58 +1,29 @@
-const fs = require('fs');
-const path = require('path');
 const moment = require('moment');
 require('moment/locale/es');
+const db = require('../db');
 
-const DB_PATH = path.join(__dirname, '..', 'data', 'cabañas.json');
-
-if (!fs.existsSync(DB_PATH)) {
-  console.warn('Warning: cabañas.json not found at expected path:', DB_PATH);
-}
-
-const loadCabañas = () => {
+const loadCabañas = async () => {
   try {
-    const data = fs.readFileSync(DB_PATH, 'utf8');
-    return JSON.parse(data);
+    const cabins = await db.runQuery('SELECT * FROM Cabins');
+    for (const cabin of cabins) {
+      const reservations = await db.runQuery(
+        'SELECT * FROM Reservations WHERE cabin_id = ?',
+        [cabin.cabin_id]
+      );
+      cabin.reservas = reservations;
+    }
+    return cabins;
   } catch (e) {
-    console.error('Error al cargar cabañas.json:', e);
+    console.error('Error loading cabins from DB:', e);
     return [];
-  }
-};
-
-const saveCabañas = (data) => {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
-};
-
-const backup = () => {
-  const backupDir = path.join(__dirname, '..', 'data', 'backups');
-  if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir);
-  }
-  const backupPath = path.join(backupDir, `cabañas-${Date.now()}.json`);
-  fs.copyFileSync(DB_PATH, backupPath);
-};
-setInterval(backup, 24 * 60 * 60 * 1000);
-
-const safeSave = async (data) => {
-  const lockFile = DB_PATH + '.lock';
-
-  while (fs.existsSync(lockFile)) {
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-
-  try {
-    fs.writeFileSync(lockFile, '');
-    saveCabañas(data);
-  } finally {
-    fs.unlinkSync(lockFile);
   }
 };
 
 const checkDisponibilidad = (cabaña, fechaEntrada, fechaSalida) => {
   return !cabaña.reservas.some(reserva => {
-    if (reserva.estado !== 'confirmada') return false;
-    const resInicio = moment(reserva.fecha_inicio);
-    const resFin = moment(reserva.fecha_fin);
+    if (reserva.status !== 'confirmada') return false;
+    const resInicio = moment(reserva.start_date);
+    const resFin = moment(reserva.end_date);
     return fechaEntrada.isBefore(resFin) && fechaSalida.isAfter(resInicio);
   });
 };
@@ -79,23 +50,139 @@ const parsearFechas = (texto) => {
   };
 };
 
-const addReserva = async (cabañaId, reservaData) => {
-  const cabañas = loadCabañas();
-  const cabañaIndex = cabañas.findIndex(c => c.id === cabañaId);
-  
-  if (cabañaIndex !== -1) {
-    cabañas[cabañaIndex].reservas.push(reservaData);
-    await safeSave(cabañas);
-    return true;
+const addReserva = async (cabañaId, userId, reservaData) => {
+  try {
+    const sql = `
+      INSERT INTO Reservations (cabin_id, user_id, start_date, end_date, status, total_price, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `;
+    const params = [
+      cabañaId,
+      userId,
+      reservaData.start_date,
+      reservaData.end_date,
+      reservaData.status,
+      reservaData.total_price || 0
+    ];
+    const result = await db.runExecute(sql, params);
+    return result.lastID ? true : false;
+  } catch (e) {
+    console.error('Error adding reservation:', e);
+    return false;
   }
-  return false;
+};
+
+const updateCabin = async (cabinId, cabinData) => {
+  try {
+    const sql = `
+      UPDATE Cabins SET name = ?, capacity = ?, price = ?, description = ?, updated_at = datetime('now')
+      WHERE cabin_id = ?
+    `;
+    const params = [
+      cabinData.name,
+      cabinData.capacity,
+      cabinData.price,
+      cabinData.description,
+      cabinId
+    ];
+    const result = await db.runExecute(sql, params);
+    return result.changes > 0;
+  } catch (e) {
+    console.error('Error updating cabin:', e);
+    return false;
+  }
+};
+
+const deleteCabin = async (cabinId) => {
+  try {
+    const sql = `DELETE FROM Cabins WHERE cabin_id = ?`;
+    const result = await db.runExecute(sql, [cabinId]);
+    return result.changes > 0;
+  } catch (e) {
+    console.error('Error deleting cabin:', e);
+    return false;
+  }
+};
+
+const updateReservation = async (reservationId, reservationData) => {
+  try {
+    const sql = `
+      UPDATE Reservations SET start_date = ?, end_date = ?, status = ?, total_price = ?, updated_at = datetime('now')
+      WHERE reservation_id = ?
+    `;
+    const params = [
+      reservationData.start_date,
+      reservationData.end_date,
+      reservationData.status,
+      reservationData.total_price,
+      reservationId
+    ];
+    const result = await db.runExecute(sql, params);
+    return result.changes > 0;
+  } catch (e) {
+    console.error('Error updating reservation:', e);
+    return false;
+  }
+};
+
+const deleteReservation = async (reservationId) => {
+  try {
+    const sql = `DELETE FROM Reservations WHERE reservation_id = ?`;
+    const result = await db.runExecute(sql, [reservationId]);
+    return result.changes > 0;
+  } catch (e) {
+    console.error('Error deleting reservation:', e);
+    return false;
+  }
+};
+
+const createCabin = async (cabinData) => {
+  try {
+    const sql = `
+      INSERT INTO Cabins (name, capacity, price, description, created_at, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+    `;
+    const params = [
+      cabinData.name,
+      cabinData.capacity,
+      cabinData.price,
+      cabinData.description
+    ];
+    const result = await db.runExecute(sql, params);
+    return result.lastID ? true : false;
+  } catch (e) {
+    console.error('Error creating cabin:', e);
+    return false;
+  }
+};
+
+const loadReservations = async () => {
+  try {
+    console.log('Intentando cargar reservas desde la base de datos...');
+    const sql = `
+      SELECT r.*, u.name as user_name, u.phone_number
+      FROM Reservations r
+      LEFT JOIN Users u ON r.user_id = u.user_id
+      ORDER BY r.start_date DESC
+    `;
+    const reservations = await db.runQuery(sql);
+    console.log('Reservas cargadas:', reservations);
+    return reservations;
+  } catch (e) {
+    console.error('Error cargando reservas desde la base de datos:', e);
+    return [];
+  }
 };
 
 module.exports = {
   loadCabañas,
-  saveCabañas,
-  safeSave,
   checkDisponibilidad,
   parsearFechas,
-  addReserva
+  addReserva,
+  updateCabin,
+  deleteCabin,
+  updateReservation,
+  deleteReservation,
+  createCabin,
+  loadReservations
 };
