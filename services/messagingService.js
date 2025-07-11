@@ -5,6 +5,12 @@ const { cargarCabanas } = require('./cabanasService');
 const { isValidUrl } = require('../utils/utils');
 
 async function enviarMenuPrincipal(bot, remitente) {
+    const GRUPO_JID = '120363420483868468@g.us'; // Ensure this matches your group JID
+    if (remitente === GRUPO_JID) {
+        // Prevent sending menu to group
+        logger.warn(`Intento de enviar menú principal al grupo ${remitente} bloqueado.`);
+        return;
+    }
     try {
         await establecerEstado(remitente, 'MENU_PRINCIPAL');
         await bot.sendMessage(remitente, { text: constants.MENU_PRINCIPAL });

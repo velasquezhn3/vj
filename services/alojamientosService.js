@@ -174,6 +174,38 @@ const loadReservations = async () => {
   }
 };
 
+const getLatestPendingReservation = async () => {
+  try {
+    const sql = `
+      SELECT * FROM Reservations
+      WHERE status = 'pendiente'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    const results = await db.runQuery(sql);
+    return results.length > 0 ? results[0] : null;
+  } catch (e) {
+    console.error('Error fetching latest pending reservation:', e);
+    return null;
+  }
+};
+
+const updateReservationStatus = async (reservationId, status) => {
+  try {
+    const sql = `
+      UPDATE Reservations
+      SET status = ?, updated_at = datetime('now')
+      WHERE reservation_id = ?
+    `;
+    const params = [status, reservationId];
+    const result = await db.runExecute(sql, params);
+    return result.changes > 0;
+  } catch (e) {
+    console.error('Error updating reservation status:', e);
+    return false;
+  }
+};
+
 module.exports = {
   loadCabañas,
   checkDisponibilidad,
@@ -184,5 +216,7 @@ module.exports = {
   updateReservation,
   deleteReservation,
   createCabin,
-  loadReservations
+  loadReservations,
+  getLatestPendingReservation,
+  updateReservationStatus
 };

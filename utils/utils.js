@@ -1,33 +1,28 @@
-/**
- * Módulo de utilidades con funciones auxiliares.
- */
+const GRUPO_JID = process.env.GRUPO_JID || '120363420483868468@g.us';
 
 /**
- * Valida el formato de fecha para reservas (ejemplo: "25/12 - 30/12").
- * @param {string} fecha - Texto con las fechas a validar.
- * @returns {boolean} - True si el formato es válido, false en caso contrario.
+ * Valida formato de fecha para reservas (ej: "25/12 - 30/12")
+ * @param {string} fecha - Texto con fechas a validar
+ * @returns {boolean} True si el formato es válido
  */
 function isValidDate(fecha) {
-  const regex = /^\d{2}\/\d{2}\s*-\s*\d{2}\/\d{2}$/;
-  return regex.test(fecha);
+  return /^\d{2}\/\d{2}\s*-\s*\d{2}\/\d{2}$/.test(fecha);
 }
 
 /**
- * Función para confirmar la reserva (puede ser extendida para lógica real).
- * @param {string} remitente - Número del usuario.
- * @param {Object} reserva - Objeto con detalles de la reserva.
+ * Simula confirmación de reserva (implementación real iría aquí)
+ * @param {string} remitente - Número del usuario
+ * @param {object} reserva - Detalles de la reserva
  */
 async function confirmarReserva(remitente, reserva) {
-  // Aquí se puede agregar lógica para guardar la reserva en base de datos o enviar confirmación
   console.log(`Reserva confirmada para ${remitente}:`, reserva);
-  // Simulación de envío de mensaje de confirmación (debe integrarse con bot)
-  // await bot.sendMessage(remitente, { text: 'Reserva confirmada. ¡Gracias!' });
+  // Lógica real de reserva iría aquí
 }
 
 /**
- * Valida si una URL es válida.
- * @param {string} urlString - La URL a validar.
- * @returns {boolean} - True si la URL es válida, false en caso contrario.
+ * Valida formato de URL
+ * @param {string} urlString - URL a validar
+ * @returns {boolean} True si es URL válida
  */
 function isValidUrl(urlString) {
   try {
@@ -38,47 +33,65 @@ function isValidUrl(urlString) {
   }
 }
 
+/**
+ * Valida disponibilidad de fechas (simulación)
+ * @param {string} fechaEntrada 
+ * @param {string} fechaSalida 
+ * @returns {boolean} True si está disponible
+ */
 async function validarDisponibilidad(fechaEntrada, fechaSalida) {
-    // Simulación: solo rechaza una fecha específica
-    if (fechaEntrada === '15/08/2025' && fechaSalida === '18/08/2025') {
-        return false;
-    }
-    return true;
+  // Lógica real de validación iría aquí
+  return !(fechaEntrada === '15/08/2025' && fechaSalida === '18/08/2025');
 }
 
-const GRUPO_JID = '120363420483868468@g.us'; // Cambia por el JID real de tu grupo
-
+/**
+ * Envía mensaje de texto al grupo designado
+ * @param {object} bot - Instancia del bot de WhatsApp
+ * @param {string} texto - Contenido del mensaje
+ */
 async function enviarAlGrupo(bot, texto) {
-    try {
-        await bot.sendMessage(GRUPO_JID, { text: texto });
-    } catch (error) {
-        console.error('Error enviando mensaje al grupo:', error);
-        try {
-            await bot.sendMessage(GRUPO_JID, { text: '⚠️ Ocurrió un error al enviar un mensaje al grupo.' });
-        } catch (err) {
-            console.error('Error enviando mensaje de error al grupo:', err);
-        }
-    }
+  try {
+    await bot.sendMessage(GRUPO_JID, { text: texto });
+  } catch (error) {
+    console.error('Error enviando al grupo:', error);
+    // No reintentar para evitar bucles de error
+  }
 }
 
+/**
+ * Reenvía comprobante al grupo con información contextual
+ * @param {object} bot - Instancia del bot
+ * @param {object} mensaje - Objeto del mensaje original
+ * @param {object} datos - Información adicional del usuario
+ */
 async function reenviarComprobanteAlGrupo(bot, mensaje, datos) {
-    try {
-        if (mensaje.imageMessage) {
-            await bot.sendMessage(GRUPO_JID, { image: mensaje.imageMessage, caption: `Comprobante de ${datos.nombre}` });
-        } else if (mensaje.documentMessage) {
-            await bot.sendMessage(GRUPO_JID, { document: mensaje.documentMessage, caption: `Comprobante de ${datos.nombre}` });
-        }
-    } catch (error) {
-        console.error('Error reenviando comprobante al grupo:', error);
-        try {
-            await bot.sendMessage(GRUPO_JID, { text: '⚠️ Ocurrió un error al reenviar un comprobante al grupo.' });
-        } catch (err) {
-            console.error('Error enviando mensaje de error al grupo:', err);
-        }
+  try {
+    const nombre = datos?.nombre || 'Cliente desconocido';
+    const caption = `✅ Comprobante de ${nombre}`;
+
+    if (mensaje.imageMessage) {
+      await bot.sendMessage(GRUPO_JID, { 
+        image: mensaje.imageMessage, 
+        caption 
+      });
+    } else if (mensaje.documentMessage) {
+      await bot.sendMessage(GRUPO_JID, { 
+        document: mensaje.documentMessage, 
+        caption,
+        mimetype: mensaje.documentMessage.mimetype || 'application/octet-stream'
+      });
+    } else {
+      console.warn('Intento de reenvío de comprobante no soportado');
+      await enviarAlGrupo(bot, `⚠️ Comprobante no reconocido de ${nombre}`);
     }
+  } catch (error) {
+    console.error('Error reenviando comprobante:', error);
+    await enviarAlGrupo(bot, '⚠️ Error procesando comprobante');
+  }
 }
 
 module.exports = {
+  GRUPO_JID,
   isValidDate,
   confirmarReserva,
   isValidUrl,
