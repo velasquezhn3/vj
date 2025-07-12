@@ -38,14 +38,18 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
         }
 
         case ESTADOS_RESERVA.NOMBRE: {
-            await bot.sendMessage(remitente, { text: '¿Cuál es tu número de teléfono?' });
-            await establecerEstado(remitente, ESTADOS_RESERVA.TELEFONO, { ...datos, nombre: mensajeTexto });
+            // Instead of asking for phone number, extract it from remitente (remoteJid)
+            const telefono = remitente.split('@')[0];
+            await bot.sendMessage(remitente, { text: '¿Cuántas personas serán?' });
+            await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { ...datos, nombre: mensajeTexto, telefono });
             break;
         }
 
         case ESTADOS_RESERVA.TELEFONO: {
+            // Skip this state since phone is already obtained
+            // Directly move to PERSONAS state if this state is reached by mistake
             await bot.sendMessage(remitente, { text: '¿Cuántas personas serán?' });
-            await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { ...datos, telefono: mensajeTexto });
+            await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { ...datos, telefono: datos.telefono || remitente.split('@')[0] });
             break;
         }
 
@@ -116,9 +120,13 @@ Personas: ${datos.personas}
 Alojamiento: ${datos.alojamiento}
 Fechas: ${datos.fechaEntrada} - ${datos.fechaSalida} (${datos.noches} noches)
 Total a pagar: $${datos.precioTotal}
-Para confirmar: /confirmar ${datos.telefono}`;
+Para confirmar:`;
 
                 await enviarAlGrupo(bot, resumen);
+
+                // Enviar comando /confirmar en mensaje separado para facilitar copia
+                const comandoConfirmar = `/confirmar ${datos.telefono}`;
+                await enviarAlGrupo(bot, comandoConfirmar);
 
                 // Reservation saving is now handled only after /confirmar command from group
                 await bot.sendMessage(remitente, { text: 'Tu reserva ha sido enviada al grupo para confirmación. Espera el comando /confirmar para guardar la reserva.' });

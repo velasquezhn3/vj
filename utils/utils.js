@@ -64,22 +64,71 @@ async function enviarAlGrupo(bot, texto) {
  * @param {object} mensaje - Objeto del mensaje original
  * @param {object} datos - Información adicional del usuario
  */
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+const streamToBuffer = require('stream-to-buffer');
+
+async function streamToBufferPromise(stream) {
+  return new Promise((resolve, reject) => {
+    streamToBuffer(stream, (err, buffer) => {
+      if (err) reject(err);
+      else resolve(buffer);
+    });
+  });
+}
+
 async function reenviarComprobanteAlGrupo(bot, mensaje, datos) {
   try {
     const nombre = datos?.nombre || 'Cliente desconocido';
     const caption = `✅ Comprobante de ${nombre}`;
 
-    if (mensaje.imageMessage) {
-      await bot.sendMessage(GRUPO_JID, { 
-        image: mensaje.imageMessage, 
-        caption 
-      });
-    } else if (mensaje.documentMessage) {
-      await bot.sendMessage(GRUPO_JID, { 
-        document: mensaje.documentMessage, 
-        caption,
-        mimetype: mensaje.documentMessage.mimetype || 'application/octet-stream'
-      });
+    const imageMsg = mensaje.imageMessage || mensaje.message?.imageMessage;
+    const documentMsg = mensaje.documentMessage || mensaje.message?.documentMessage;
+
+    if (imageMsg) {
+      console.log('Descargando imagen...');
+      const stream = await downloadContentFromMessage({ imageMessage: imageMsg }, 'image');
+      if (!stream) {
+        console.error('No se pudo obtener el stream de la imagen.');
+        return;
+      }
+      const buffer = await streamToBufferPromise(stream);
+      if (!buffer || buffer.length === 0) {
+        console.error('Buffer de imagen vacío o inválido.');
+        return;
+      }
+      console.log('Reenviando imagen al grupo...');
+      try {
+        await bot.sendMessage(GRUPO_JID, { 
+          image: buffer, 
+          caption 
+        });
+        console.log('Imagen reenviada correctamente');
+      } catch (err) {
+        console.error('Error enviando imagen al grupo:', err);
+      }
+    } else if (documentMsg) {
+      console.log('Descargando documento...');
+      const stream = await downloadContentFromMessage({ documentMessage: documentMsg }, 'document');
+      if (!stream) {
+        console.error('No se pudo obtener el stream del documento.');
+        return;
+      }
+      const buffer = await streamToBufferPromise(stream);
+      if (!buffer || buffer.length === 0) {
+        console.error('Buffer de documento vacío o inválido.');
+        return;
+      }
+      console.log('Reenviando documento al grupo...');
+      try {
+        await bot.sendMessage(GRUPO_JID, { 
+          document: buffer, 
+          caption,
+          mimetype: documentMsg.mimetype || 'application/octet-stream'
+        });
+        console.log('Documento reenviado correctamente');
+      } catch (err) {
+        console.error('Error enviando documento al grupo:', err);
+      }
     } else {
       console.warn('Intento de reenvío de comprobante no soportado');
       await enviarAlGrupo(bot, `⚠️ Comprobante no reconocido de ${nombre}`);

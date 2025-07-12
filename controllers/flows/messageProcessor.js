@@ -1,3 +1,6 @@
+
+// Full original content of vj/controllers/flows/messageProcessor.js with deposit receipt forwarding integrated
+
 const { obtenerEstado, establecerEstado } = require('../../services/stateService');
 const { handleGreeting } = require('./greetingHandler');
 const { handleMenuState } = require('./menuHandler');
@@ -6,7 +9,7 @@ const { handleReservaState } = require('./reservaFlowHandler');
 const { ESTADOS_RESERVA } = require('../reservaConstants');
 const { enviarMenuPrincipal } = require('../../services/messagingService');
 const logger = require('../../config/logger');
-const { GRUPO_JID } = require('../../utils/utils');
+const { reenviarComprobanteAlGrupo, GRUPO_JID } = require('../../utils/utils');
 const alojamientosService = require('../../services/alojamientosService');
 
 // Comandos válidos para grupos
@@ -23,7 +26,7 @@ const groupCommandHandlers = {
     [GROUP_COMMANDS.CANCELAR]: handleCancelarCommand
 };
 
-async function handleGroupCommand(bot, remitente, mensajeTexto) {
+async function handleGroupCommand(bot, remitente, mensajeTexto, mensajeObj) {
     const [command, param] = mensajeTexto.split(' ');
 
     if (!(command in groupCommandHandlers)) {
@@ -35,7 +38,8 @@ async function handleGroupCommand(bot, remitente, mensajeTexto) {
     }
 
     try {
-        await groupCommandHandlers[command](bot, remitente, param);
+        // Pass mensajeObj to handlers to allow extracting remoteJid
+        await groupCommandHandlers[command](bot, remitente, param, mensajeObj);
     } catch (error) {
         logger.error(`Error procesando comando ${command}: ${error.message}`, { error });
         await bot.sendMessage(remitente, { 
@@ -47,43 +51,101 @@ async function handleGroupCommand(bot, remitente, mensajeTexto) {
 const fs = require('fs');
 const path = require('path');
 
-async function handleConfirmarCommand(bot, remitente, param) {
-    logger.info(`Comando /confirmar recibido con parámetro: ${param || 'ninguno'}`);
+async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
+    try {
+        logger.info(`Comando /confirmar recibido con parámetro: ${param || 'ninguno'}`);
 
-    // Cargar cabañas
-    const cabinsDataPath = path.join(__dirname, '../../data/cabañas.json');
-    const cabinsJson = fs.readFileSync(cabinsDataPath, 'utf-8');
-    const cabins = JSON.parse(cabinsJson);
+        // Cargar cabañas
+        const cabinsDataPath = path.join(__dirname, '../../data/cabañas.json');
+        const cabinsJson = fs.readFileSync(cabinsDataPath, 'utf-8');
+        const cabins = JSON.parse(cabinsJson);
 
-    // Asignar cabaña según lógica de personas (ejemplo: 1-3 pers: cab1, 4-6 pers: cab2, 7-9 pers: cab3)
-    // Aquí asumimos que el número de personas se pasa como segundo parámetro (param2)
-    // Si no se tiene, asignamos la primera cabaña por defecto
-    let cabinId = cabins[0].id;
+        // Asignar cabaña según lógica de personas (ejemplo: 1-3 pers: cab1, 4-6 pers: cab2, 7-9 pers: cab3)
+        // Aquí asumimos que el número de personas se pasa como segundo parámetro (param2)
+        // Si no se tiene, asignamos la primera cabaña por defecto
+        let cabinId = cabins[0].id;
 
-    // Para obtener número de personas, se podría pasar como parte del parámetro o buscar en DB (no implementado)
-    // Por simplicidad, asignamos la primera cabaña
+        // Para obtener número de personas, se podría pasar como parte del parámetro o buscar en DB (no implementado)
+        // Por simplicidad, asignamos la primera cabaña
 
-    // Usar teléfono como user_id
-    const userId = param;
+        // Determinar userId: si el comando viene de un grupo, extraer de param limpiando sufijo @s.whatsapp.net, si no usar param tal cual
+        let userId;
+        if (remitente.endsWith('@g.us')) {
+            // En grupo, param puede venir con sufijo @s.whatsapp.net, quitarlo
+            userId = param ? param.replace(/@s\.whatsapp\.net$/, '') : undefined;
+        } else {
+            // En privado, usar param tal cual
+            userId = param;
+        }
 
-    // Crear reserva con datos mínimos
-    const reservaData = {
-        start_date: new Date().toISOString().split('T')[0], // fecha actual como ejemplo
-        end_date: new Date().toISOString().split('T')[0],   // fecha actual como ejemplo
-        status: 'pendiente',
-        total_price: 0
-    };
+        if (!userId) {
+            throw new Error('No se pudo determinar el número de teléfono del usuario');
+        }
 
-    const success = await alojamientosService.addReserva(cabinId, userId, reservaData);
+        // Crear reserva con datos mínimos
+        const reservaData = {
+            start_date: new Date().toISOString().split('T')[0], // fecha actual como ejemplo
+            end_date: new Date().toISOString().split('T')[0],   // fecha actual como ejemplo
+            status: 'pendiente',
+            total_price: cabins[0].price || 0
+        };
 
-    if (success) {
-        await bot.sendMessage(remitente, { 
-            text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${param}` 
-        });
+        const success = await alojamientosService.addReserva(cabinId, userId, reservaData);
+        logger.info(`Resultado de addReserva: ${success}`);
 
-        // Aquí se podrían enviar instrucciones de depósito si se dispone de más datos
-    } else {
-        throw new Error('Error al guardar la reserva en la base de datos');
+        if (success) {
+            // Construir JID del usuario a partir del número limpio
+            const userJid = `${userId}@s.whatsapp.net`;
+
+            // Enviar mensaje de confirmación al grupo
+            try {
+                await bot.sendMessage(GRUPO_JID, {
+                    text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${userId}`
+                });
+                logger.info(`Mensaje de confirmación enviado al grupo ${GRUPO_JID}`);
+            } catch (err) {
+                logger.error(`Error enviando mensaje de confirmación al grupo ${GRUPO_JID}: ${err.message}`, { err });
+            }
+
+            // Enviar mensaje de confirmación al usuario
+            try {
+                await bot.sendMessage(userJid, { 
+                    text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${userId}` 
+                });
+                logger.info(`Mensaje de confirmación enviado a ${userJid}`);
+            } catch (err) {
+                logger.error(`Error enviando mensaje de confirmación a ${userJid}: ${err.message}`, { err });
+            }
+
+            // Enviar instrucciones de depósito al usuario (independiente)
+            const depositInstructions = `Su reserva fue aprobada. Tiene 24 horas para enviar el comprobante de transferencia a los siguientes bancos:
+- Ficohsa
+- BAC
+- Occidente
+- Atlántida
+Puedes enviar la foto de la reserva en este chat o más adelante, seleccionando la opción 8: Ayuda post-reserva.`;
+
+            try {
+                logger.info(`Intentando enviar instrucciones de depósito a ${userJid}`);
+                const sent = await bot.sendMessage(userJid, { text: depositInstructions });
+                logger.info(`Instrucciones de depósito enviadas a ${userJid}`, { sent });
+            } catch (err) {
+                logger.error(`Error enviando instrucciones de depósito a ${userJid}: ${err.message}`, { err });
+            }
+
+            // Enviar mensaje de prueba al remitente original para verificar conectividad
+            try {
+                await bot.sendMessage(remitente, { text: 'Mensaje de prueba para verificar conectividad.' });
+                logger.info(`Mensaje de prueba enviado a remitente ${remitente}`);
+            } catch (err) {
+                logger.error(`Error enviando mensaje de prueba a remitente ${remitente}: ${err.message}`, { err });
+            }
+        } else {
+            throw new Error('Error al guardar la reserva en la base de datos');
+        }
+    } catch (error) {
+        logger.error(`Error en handleConfirmarCommand: ${error.message}`, { error });
+        await bot.sendMessage(remitente, { text: '⚠️ Error procesando la reserva. Por favor intenta nuevamente.' });
     }
 }
 
@@ -101,16 +163,19 @@ async function handleCancelarCommand(bot, remitente) {
     });
 }
 
-async function handleConfirmadoCommand(bot, remitente, telefono) {
-    if (!telefono) {
-        await bot.sendMessage(remitente, { text: '❌ Por favor proporciona un número de teléfono. Uso: /confirmado [telefono]' });
+async function handleConfirmadoCommand(bot, remitente, telefono, mensajeObj) {
+    // Ignore telefono param, use remoteJid from mensajeObj to get full phone number with country code
+    const userId = mensajeObj?.key?.remoteJid?.split('@')[0];
+
+    if (!userId) {
+        await bot.sendMessage(remitente, { text: '❌ No se pudo obtener el número de teléfono del usuario.' });
         return;
     }
 
-    // Buscar reserva pendiente por teléfono
-    const reservation = await alojamientosService.getReservationByPhoneAndStatus(telefono, 'pendiente');
+    // Buscar reserva pendiente por teléfono usando userId con código de país
+    const reservation = await alojamientosService.getReservationByPhoneAndStatus(userId, 'pendiente');
     if (!reservation) {
-        await bot.sendMessage(remitente, { text: `❌ No se encontró reserva pendiente para el teléfono ${telefono}` });
+        await bot.sendMessage(remitente, { text: `❌ No se encontró reserva pendiente para el teléfono ${userId}` });
         return;
     }
 
@@ -134,7 +199,14 @@ Número de cuenta: 123456789\n
 Titular: Empresa Ejemplo\n
 Una vez realizado el depósito, envía el comprobante aquí.`;
 
-    await bot.sendMessage(reservation.telefono, { text: depositMessage });
+    const userJid = `${userId}@s.whatsapp.net`;
+
+    try {
+        const sent = await bot.sendMessage(userJid, { text: depositMessage });
+        logger.info(`Mensaje de instrucciones de depósito enviado a ${userJid}`, { sent });
+    } catch (err) {
+        logger.error(`Error enviando instrucciones de depósito a ${userJid}: ${err.message}`, { err });
+    }
 }
 
 async function handleReservadoCommand(bot, remitente, telefono) {
@@ -206,6 +278,20 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
             message: mensajeTexto
         });
 
+        // Log messageObj for debugging
+        logger.debug('Mensaje recibido:', mensajeObj);
+
+        // Check if message contains image or document to forward as deposit receipt
+        const hasImage = mensajeObj?.message?.imageMessage || mensajeObj?.imageMessage;
+        const hasDocument = mensajeObj?.message?.documentMessage || mensajeObj?.documentMessage;
+
+        if (estado === ESTADOS_RESERVA.ESPERANDO_CONFIRMACION && (hasImage || hasDocument)) {
+            logger.info('Estado ESPERANDO_CONFIRMACION y mensaje con imagen o documento detectado, reenviando comprobante al grupo.');
+            // Forward deposit receipt to group
+            await reenviarComprobanteAlGrupo(bot, mensajeObj, datos);
+            return;
+        }
+
         // Router de estados
         const stateHandlers = {
             MENU_PRINCIPAL: () => handleMenuState(bot, remitente, mensajeTexto, estado, establecerEstado),
@@ -237,7 +323,7 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
         logger.error(`Error procesando mensaje de ${remitente}: ${error.message}`, {
             stack: error.stack,
             userId: remitente,
-            mensaje: mensajeTexto || mensaje
+            mensaje: mensaje || ''
         });
 
         try {
