@@ -206,6 +206,19 @@ const updateReservationStatus = async (reservationId, status) => {
   }
 };
 
+async function getReservationById(reservationId) {
+  try {
+    const sql = `
+      SELECT * FROM Reservations WHERE reservation_id = ?
+    `;
+    const results = await db.runQuery(sql, [reservationId]);
+    return results.length > 0 ? results[0] : null;
+  } catch (e) {
+    console.error('Error fetching reservation by ID:', e);
+    return null;
+  }
+}
+
 module.exports = {
   loadCabañas,
   checkDisponibilidad,
@@ -218,5 +231,6 @@ module.exports = {
   createCabin,
   loadReservations,
   getLatestPendingReservation,
-  updateReservationStatus
+  updateReservationStatus,
+  getReservationById
 };

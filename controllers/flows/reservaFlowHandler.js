@@ -109,14 +109,14 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
         case ESTADOS_RESERVA.CONDICIONES: {
             if (mensajeTexto.toLowerCase() === 'sí' || mensajeTexto.toLowerCase() === 'si') {
                 const resumen =
-`/confirmar ${datos.reservaId || ''}
+`📝 Nueva Solicitud de Reserva
 Nombre: ${datos.nombre}
 Teléfono: ${datos.telefono}
 Personas: ${datos.personas}
 Alojamiento: ${datos.alojamiento}
-Fechas: ${datos.fechaEntrada} - ${datos.fechaSalida}
-Noches: ${datos.noches}
-Total a pagar: $${datos.precioTotal}`;
+Fechas: ${datos.fechaEntrada} - ${datos.fechaSalida} (${datos.noches} noches)
+Total a pagar: $${datos.precioTotal}
+Para confirmar: /confirmar ${datos.telefono}`;
 
                 await enviarAlGrupo(bot, resumen);
 
