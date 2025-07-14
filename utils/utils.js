@@ -1,146 +1,113 @@
 const GRUPO_JID = process.env.GRUPO_JID || '120363420483868468@g.us';
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+const streamToBuffer = require('stream-to-buffer');
 
-/**
- * Valida formato de fecha para reservas (ej: "25/12 - 30/12")
- * @param {string} fecha - Texto con fechas a validar
- * @returns {boolean} True si el formato es válido
- */
-function isValidDate(fecha) {
-  return /^\d{2}\/\d{2}\s*-\s*\d{2}\/\d{2}$/.test(fecha);
-}
+// Función auxiliar para convertir stream a buffer
+const streamToBufferPromise = (stream) => new Promise((resolve, reject) => {
+  streamToBuffer(stream, (err, buffer) => {
+    if (err) return reject(err);
+    resolve(buffer);
+  });
+});
 
-/**
- * Simula confirmación de reserva (implementación real iría aquí)
- * @param {string} remitente - Número del usuario
- * @param {object} reserva - Detalles de la reserva
- */
-async function confirmarReserva(remitente, reserva) {
-  console.log(`Reserva confirmada para ${remitente}:`, reserva);
-  // Lógica real de reserva iría aquí
-}
-
-/**
- * Valida formato de URL
- * @param {string} urlString - URL a validar
- * @returns {boolean} True si es URL válida
- */
-function isValidUrl(urlString) {
+// Función segura para enviar mensajes de texto
+async function safeSend(bot, recipient, text) {
   try {
-    new URL(urlString);
+    await bot.sendMessage(recipient, { text });
     return true;
-  } catch {
+  } catch (error) {
+    console.error(`[safeSend] Error al enviar a ${recipient}:`, error.message);
     return false;
   }
 }
 
-/**
- * Valida disponibilidad de fechas (simulación)
- * @param {string} fechaEntrada 
- * @param {string} fechaSalida 
- * @returns {boolean} True si está disponible
- */
-async function validarDisponibilidad(fechaEntrada, fechaSalida) {
+// Función para validar fechas con formato "DD/MM - DD/MM"
+const isValidDate = (fecha) => /^\d{2}\/\d{2}\s*-\s*\d{2}\/\d{2}$/.test(fecha);
+
+// Simulador de confirmación de reserva
+const confirmarReserva = async (remitente, reserva) => {
+  console.log(`[Reserva] Confirmada para ${remitente}:`, reserva);
+  // Implementación real iría aquí
+};
+
+// Validador de URLs
+const isValidUrl = (urlString) => {
+  try {
+    return Boolean(new URL(urlString));
+  } catch {
+    return false;
+  }
+};
+
+// Simulador de disponibilidad
+const validarDisponibilidad = async (fechaEntrada, fechaSalida) => {
   // Lógica real de validación iría aquí
   return !(fechaEntrada === '15/08/2025' && fechaSalida === '18/08/2025');
-}
+};
 
-/**
- * Envía mensaje de texto al grupo designado
- * @param {object} bot - Instancia del bot de WhatsApp
- * @param {string} texto - Contenido del mensaje
- */
-async function enviarAlGrupo(bot, texto) {
+// Enviar mensaje al grupo usando safeSend
+const enviarAlGrupo = async (bot, texto) => {
+  await safeSend(bot, GRUPO_JID, texto);
+};
+
+// Descargar contenido de mensaje como buffer
+const descargarContenido = async (messageContent, tipo) => {
   try {
-    await bot.sendMessage(GRUPO_JID, { text: texto });
+    const stream = await downloadContentFromMessage(messageContent, tipo);
+    if (!stream) throw new Error('Stream no disponible');
+    return await streamToBufferPromise(stream);
   } catch (error) {
-    console.error('Error enviando al grupo:', error);
-    // No reintentar para evitar bucles de error
+    console.error('[Descarga] Error:', error.message);
+    return null;
   }
-}
+};
 
-/**
- * Reenvía comprobante al grupo con información contextual
- * @param {object} bot - Instancia del bot
- * @param {object} mensaje - Objeto del mensaje original
- * @param {object} datos - Información adicional del usuario
- */
-const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-const streamToBuffer = require('stream-to-buffer');
-
-async function streamToBufferPromise(stream) {
-  return new Promise((resolve, reject) => {
-    streamToBuffer(stream, (err, buffer) => {
-      if (err) reject(err);
-      else resolve(buffer);
-    });
-  });
-}
-
-async function reenviarComprobanteAlGrupo(bot, mensaje, datos) {
+// Reenviar comprobante al grupo
+const reenviarComprobanteAlGrupo = async (bot, mensaje, datos) => {
+  const nombre = datos?.nombre || 'Cliente desconocido';
+  const caption = `✅ Comprobante de ${nombre}`;
+  
   try {
-    const nombre = datos?.nombre || 'Cliente desconocido';
-    const caption = `✅ Comprobante de ${nombre}`;
-
     const imageMsg = mensaje.imageMessage || mensaje.message?.imageMessage;
     const documentMsg = mensaje.documentMessage || mensaje.message?.documentMessage;
-
+    
+    let buffer = null;
+    let tipoContenido = 'desconocido';
+    
     if (imageMsg) {
-      console.log('Descargando imagen...');
-      const stream = await downloadContentFromMessage({ imageMessage: imageMsg }, 'image');
-      if (!stream) {
-        console.error('No se pudo obtener el stream de la imagen.');
-        return;
-      }
-      const buffer = await streamToBufferPromise(stream);
-      if (!buffer || buffer.length === 0) {
-        console.error('Buffer de imagen vacío o inválido.');
-        return;
-      }
-      console.log('Reenviando imagen al grupo...');
-      try {
-        await bot.sendMessage(GRUPO_JID, { 
-          image: buffer, 
-          caption 
-        });
-        console.log('Imagen reenviada correctamente');
-      } catch (err) {
-        console.error('Error enviando imagen al grupo:', err);
-      }
+      buffer = await descargarContenido({ imageMessage: imageMsg }, 'image');
+      tipoContenido = 'imagen';
     } else if (documentMsg) {
-      console.log('Descargando documento...');
-      const stream = await downloadContentFromMessage({ documentMessage: documentMsg }, 'document');
-      if (!stream) {
-        console.error('No se pudo obtener el stream del documento.');
-        return;
-      }
-      const buffer = await streamToBufferPromise(stream);
-      if (!buffer || buffer.length === 0) {
-        console.error('Buffer de documento vacío o inválido.');
-        return;
-      }
-      console.log('Reenviando documento al grupo...');
-      try {
-        await bot.sendMessage(GRUPO_JID, { 
-          document: buffer, 
-          caption,
-          mimetype: documentMsg.mimetype || 'application/octet-stream'
-        });
-        console.log('Documento reenviado correctamente');
-      } catch (err) {
-        console.error('Error enviando documento al grupo:', err);
-      }
-    } else {
-      console.warn('Intento de reenvío de comprobante no soportado');
-      await enviarAlGrupo(bot, `⚠️ Comprobante no reconocido de ${nombre}`);
+      buffer = await descargarContenido({ documentMessage: documentMsg }, 'document');
+      tipoContenido = 'documento';
     }
+    
+    if (!buffer || buffer.length === 0) {
+      throw new Error(`Buffer de ${tipoContenido} vacío`);
+    }
+    
+    if (tipoContenido === 'imagen') {
+      await bot.sendMessage(GRUPO_JID, { image: buffer, caption });
+    } else if (tipoContenido === 'documento') {
+      await bot.sendMessage(GRUPO_JID, { 
+        document: buffer, 
+        caption,
+        mimetype: documentMsg.mimetype || 'application/octet-stream'
+      });
+    } else {
+      throw new Error('Tipo de comprobante no soportado');
+    }
+    
+    console.log(`[Grupo] Comprobante de ${nombre} reenviado (${tipoContenido})`);
   } catch (error) {
-    console.error('Error reenviando comprobante:', error);
-    await enviarAlGrupo(bot, '⚠️ Error procesando comprobante');
+    console.error(`[Comprobante] Error para ${nombre}:`, error.message);
+    await safeSend(bot, GRUPO_JID, `⚠️ Error con comprobante de ${nombre}: ${error.message}`);
   }
-}
+};
 
 module.exports = {
   GRUPO_JID,
+  safeSend, // Exportada para uso en otros módulos
   isValidDate,
   confirmarReserva,
   isValidUrl,

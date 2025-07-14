@@ -3,73 +3,103 @@ const { handleMainMenuOptions } = require('../mainMenuHandler');
 const { exportarReservasAExcel } = require('../../services/reservaExportService');
 const logger = require('../../config/logger');
 
-async function handleMenuState(bot, remitente, mensajeTexto, estado, establecerEstado) {
-    switch (estado) {
-        case 'MENU_PRINCIPAL': {
-            if (mensajeTexto.trim() === '1') {
-                // Mostrar menú de alojamientos directamente
-                await enviarMenuCabanas(bot, remitente);
-            } else if (mensajeTexto.trim().toLowerCase() === 'exportar reservas') {
-                try {
-                    const rutaArchivo = await exportarReservasAExcel();
-                    await bot.sendMessage(remitente, { text: `Reservas exportadas exitosamente. Archivo guardado en: ${rutaArchivo}` });
-                } catch (error) {
-                    await bot.sendMessage(remitente, { text: 'Error al exportar las reservas. Por favor intenta más tarde.' });
-                }
-            } else {
-                await handleMainMenuOptions(bot, remitente, mensajeTexto.trim(), establecerEstado);
-            }
-            break;
+// Handlers específicos para cada estado
+async function handleMenuPrincipal(bot, remitente, mensajeTexto, establecerEstado) {
+    if (mensajeTexto.trim() === '1') {
+        await enviarMenuCabanas(bot, remitente);
+        establecerEstado('LISTA_CABAÑAS');
+    } else if (mensajeTexto.trim().toLowerCase() === 'exportar reservas') {
+        try {
+            const rutaArchivo = await exportarReservasAExcel();
+            await bot.sendMessage(remitente, { 
+                text: `✅ Reservas exportadas exitosamente.\n📁 Ruta: ${rutaArchivo}` 
+            });
+        } catch (error) {
+            logger.error(`Error exportando reservas: ${error}`, error);
+            await bot.sendMessage(remitente, { 
+                text: '❌ Error al exportar reservas. Por favor intenta más tarde.' 
+            });
         }
+    } else {
+        await handleMainMenuOptions(bot, remitente, mensajeTexto.trim(), establecerEstado);
+    }
+}
 
-        case 'LISTA_CABAÑAS': {
-            if (mensajeTexto.trim() === '0') {
-                await enviarMenuPrincipal(bot, remitente);
-            } else {
-                const seleccion = parseInt(mensajeTexto.trim());
-                if (isNaN(seleccion)) {
-                    await bot.sendMessage(remitente, {
-                        text: '⚠️ Por favor ingresa solo el número de la cabaña que deseas ver.'
-                    });
-                    await enviarMenuCabanas(bot, remitente);
-                } else {
-                    await enviarDetalleCabaña(bot, remitente, seleccion);
-                }
-            }
+async function handleListaCabanas(bot, remitente, mensajeTexto, establecerEstado) {
+    if (mensajeTexto.trim() === '0') {
+        await enviarMenuPrincipal(bot, remitente);
+        establecerEstado('MENU_PRINCIPAL');
+        return;
+    }
+
+    const seleccion = parseInt(mensajeTexto.trim());
+    if (isNaN(seleccion)) {
+        await bot.sendMessage(remitente, {
+            text: '⚠️ Por favor ingresa solo el número de la cabaña.'
+        });
+        await enviarMenuCabanas(bot, remitente);
+    } else {
+        await enviarDetalleCabaña(bot, remitente, seleccion);
+        establecerEstado('DETALLE_CABAÑA');
+    }
+}
+
+async function handleDetalleCabana(bot, remitente, mensajeTexto, establecerEstado) {
+    const OPCIONES = {
+        VOLVER: '1',
+        RESERVAR: '2',
+        MENU_PRINCIPAL: '0'
+    };
+
+    switch (mensajeTexto.trim()) {
+        case OPCIONES.VOLVER:
+            await enviarMenuCabanas(bot, remitente);
+            establecerEstado('LISTA_CABAÑAS');
             break;
-        }
-
-        case 'DETALLE_CABAÑA': {
-            switch (mensajeTexto.trim().toLowerCase()) {
-                case '1':
-                    await enviarMenuCabanas(bot, remitente);
-                    break;
-                case '2':
-                    await bot.sendMessage(remitente, {
-                        text: 'Funcionalidad de reserva aún no implementada. Serás redirigido al menú principal.'
-                    });
-                    await enviarMenuPrincipal(bot, remitente);
-                    break;
-                case '0':
-                    await enviarMenuPrincipal(bot, remitente);
-                    break;
-                default:
-                    await bot.sendMessage(bot, {
-                        text: '⚠️ Opción no reconocida. Por favor selecciona una opción válida.'
-                    });
-                    if (datos && datos.seleccion) {
-                        await enviarDetalleCabaña(bot, remitente, datos.seleccion);
-                    } else {
-                        await enviarMenuCabanas(bot, remitente);
-                    }
-                    break;
-            }
+            
+        case OPCIONES.RESERVAR:
+            await bot.sendMessage(remitente, {
+                text: '⏳ Funcionalidad de reserva en desarrollo. Serás redirigido al menú principal.'
+            });
+            await enviarMenuPrincipal(bot, remitente);
+            establecerEstado('MENU_PRINCIPAL');
             break;
-        }
-
+            
+        case OPCIONES.MENU_PRINCIPAL:
+            await enviarMenuPrincipal(bot, remitente);
+            establecerEstado('MENU_PRINCIPAL');
+            break;
+            
         default:
-            // Not handled here
+            await bot.sendMessage(remitente, {
+                text: '⚠️ Opción no válida. Por favor selecciona una opción del menú.'
+            });
+            // Reenviar menú actual manteniendo el estado
             break;
+    }
+}
+
+// Handler principal mejorado
+async function handleMenuState(bot, remitente, mensajeTexto, estado, establecerEstado) {
+    try {
+        const handlers = {
+            'MENU_PRINCIPAL': handleMenuPrincipal,
+            'LISTA_CABAÑAS': handleListaCabanas,
+            'DETALLE_CABAÑA': handleDetalleCabana
+        };
+
+        if (handlers[estado]) {
+            await handlers[estado](bot, remitente, mensajeTexto, establecerEstado);
+        } else {
+            logger.warn(`Estado no manejado: ${estado}`);
+        }
+    } catch (error) {
+        logger.error(`Error en handleMenuState: ${error.message}`, error);
+        await bot.sendMessage(remitente, {
+            text: '⚠️ Ocurrió un error inesperado. Reiniciando menú...'
+        });
+        await enviarMenuPrincipal(bot, remitente);
+        establecerEstado('MENU_PRINCIPAL');
     }
 }
 

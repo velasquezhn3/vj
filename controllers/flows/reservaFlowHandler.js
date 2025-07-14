@@ -2,164 +2,200 @@ const { establecerEstado } = require('../../services/stateService');
 const { calcularPrecioTotal } = require('../../services/reservaPriceService');
 const { enviarAlGrupo, reenviarComprobanteAlGrupo } = require('../../utils/utils');
 const { ESTADOS_RESERVA } = require('../reservaConstants');
-const usersService = require('../../services/usersService');
+
+// Funciones auxiliares para mejorar la legibilidad
+const parsearFechas = (texto) => {
+    const [entrada, salida] = texto.split('-').map(s => s.trim());
+    return { entrada, salida };
+};
+
+const validarFormatoFecha = (fecha) => {
+    return /^\d{2}\/\d{2}\/\d{4}$/.test(fecha);
+};
+
+const calcularDiferenciaDias = (entrada, salida) => {
+    const fechaEntrada = new Date(entrada.split('/').reverse().join('-'));
+    const fechaSalida = new Date(salida.split('/').reverse().join('-'));
+    return Math.ceil((fechaSalida - fechaEntrada) / (1000 * 60 * 60 * 24));
+};
+
+const asignarAlojamiento = (personas) => {
+    if (personas <= 3) return 'Cabaña Tortuga';
+    if (personas <= 6) return 'Cabaña Caracol';
+    if (personas <= 9) return 'Cabaña Tiburón';
+    return null;
+};
 
 async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje) {
-    switch (estado) {
-        case ESTADOS_RESERVA.FECHAS: {
-            const partes = mensajeTexto.split('-');
-            if (partes.length !== 2) {
-                await bot.sendMessage(remitente, { text: 'Por favor, usa el formato correcto: 20/08/2025 - 25/08/2025' });
-                return;
-            }
-            const fechaEntradaStr = partes[0].trim();
-            const fechaSalidaStr = partes[1].trim();
-
-            const [diaE, mesE, anioE] = fechaEntradaStr.split('/');
-            const [diaS, mesS, anioS] = fechaSalidaStr.split('/');
-            const fechaEntradaDate = new Date(anioE, mesE - 1, diaE);
-            const fechaSalidaDate = new Date(anioS, mesS - 1, diaS);
-            const diffTime = fechaSalidaDate - fechaEntradaDate;
-            const noches = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-            if (noches < 1) {
-                await bot.sendMessage(remitente, { text: 'La fecha de salida debe ser posterior a la fecha de entrada. Por favor, ingresa las fechas nuevamente.' });
-                return;
-            }
-
-            const disponible = true; // Cambiar por función real si se desea
-            if (disponible) {
-                await bot.sendMessage(remitente, { text: '✅ ¡Fechas disponibles! Continuemos...\nPor favor, dime tu nombre completo:' });
-                await establecerEstado(remitente, ESTADOS_RESERVA.NOMBRE, { fechaEntrada: fechaEntradaStr, fechaSalida: fechaSalidaStr, noches });
-            } else {
-                await bot.sendMessage(remitente, { text: '❌ Lo sentimos, esas fechas no están disponibles. ¿Deseas intentar con otras?' });
-            }
-            break;
-        }
-
-        case ESTADOS_RESERVA.NOMBRE: {
-            // Instead of asking for phone number, extract it from remitente (remoteJid)
-            const telefono = remitente.split('@')[0];
-            await bot.sendMessage(remitente, { text: '¿Cuántas personas serán?' });
-            await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { ...datos, nombre: mensajeTexto, telefono });
-            break;
-        }
-
-        case ESTADOS_RESERVA.TELEFONO: {
-            // Skip this state since phone is already obtained
-            // Directly move to PERSONAS state if this state is reached by mistake
-            await bot.sendMessage(remitente, { text: '¿Cuántas personas serán?' });
-            await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { ...datos, telefono: datos.telefono || remitente.split('@')[0] });
-            break;
-        }
-
-        case ESTADOS_RESERVA.PERSONAS: {
-            const cantidad = parseInt(mensajeTexto.trim());
-
-            if (isNaN(cantidad) || cantidad < 1) {
-                await bot.sendMessage(remitente, { text: 'Por favor, ingresa una cantidad válida de personas (número mayor a 0).' });
-                return;
-            }
-
-            let alojamiento = '';
-            if (cantidad <= 3) {
-                alojamiento = 'Cabaña Tortuga';
-            } else if (cantidad <= 6) {
-                alojamiento = 'Cabaña Caracol';
-            } else if (cantidad <= 9) {
-                alojamiento = 'Cabaña Tiburón';
-            } else {
-                await bot.sendMessage(remitente, {
-                    text: `La cantidad ingresada (${cantidad}) excede la capacidad máxima por cabaña (9 personas). Te sugerimos alquilar más de una cabaña.`
+    try {
+        switch (estado) {
+            case ESTADOS_RESERVA.FECHAS: {
+                const { entrada, salida } = parsearFechas(mensajeTexto);
+                
+                if (!entrada || !salida) {
+                    await bot.sendMessage(remitente, { text: '❌ Formato incorrecto. Usa: *20/08/2025 - 25/08/2025*' });
+                    return;
+                }
+                
+                if (!validarFormatoFecha(entrada) || !validarFormatoFecha(salida)) {
+                    await bot.sendMessage(remitente, { text: '📅 Formato de fecha inválido. Usa *DD/MM/AAAA*' });
+                    return;
+                }
+                
+                const noches = calcularDiferenciaDias(entrada, salida);
+                
+                if (noches < 1) {
+                    await bot.sendMessage(remitente, { text: '❌ La fecha de salida debe ser *posterior* a la entrada' });
+                    return;
+                }
+                
+                // Simulación de disponibilidad (reemplazar con lógica real)
+                const disponible = true; 
+                
+                if (!disponible) {
+                    await bot.sendMessage(remitente, { text: '❌ Fechas no disponibles. Intenta con otras:' });
+                    return;
+                }
+                
+                await bot.sendMessage(remitente, { 
+                    text: `✅ *¡Fechas disponibles!*\n${noches} noches seleccionadas\n\n📝 *Por favor, dime tu nombre completo:*` 
                 });
-                return;
+                
+                await establecerEstado(remitente, ESTADOS_RESERVA.NOMBRE, { 
+                    fechaEntrada: entrada, 
+                    fechaSalida: salida, 
+                    noches 
+                });
+                break;
             }
 
-            await bot.sendMessage(remitente, {
-                text: `Perfecto. Se asignó automáticamente *${alojamiento}* para ${cantidad} persona(s).`
-            });
-
-            const noches = datos.noches;
-            if (!noches) {
-                await bot.sendMessage(remitente, { text: 'Error: no se encontró el número de noches. Por favor, reinicia la reserva.' });
-                await establecerEstado(remitente, 'MENU_PRINCIPAL');
-                return;
+            case ESTADOS_RESERVA.NOMBRE: {
+                const telefono = remitente.split('@')[0];
+                await bot.sendMessage(remitente, { text: '👥 *¿Cuántas personas serán?*' });
+                await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { 
+                    ...datos, 
+                    nombre: mensajeTexto.trim(),
+                    telefono 
+                });
+                break;
             }
 
-            // Agregar log para depuración
-            console.log(`Calcular precio total: alojamiento=${alojamiento}, fechaEntrada=${datos.fechaEntrada}, noches=${noches}`);
+            case ESTADOS_RESERVA.PERSONAS: {
+                const cantidad = parseInt(mensajeTexto);
+                
+                if (isNaN(cantidad) || cantidad < 1) {
+                    await bot.sendMessage(remitente, { text: '🔢 Por favor ingresa un *número válido* (ej: 4)' });
+                    return;
+                }
+                
+                const alojamiento = asignarAlojamiento(cantidad);
+                
+                if (!alojamiento) {
+                    await bot.sendMessage(remitente, {
+                        text: `⚠️ *Capacidad excedida* (${cantidad} personas)\nSugerencia: Alquila múltiples cabañas`
+                    });
+                    return;
+                }
+                
+                await bot.sendMessage(remitente, {
+                    text: `🏠 *Asignado automáticamente:*\n*${alojamiento}* para ${cantidad} persona(s)`
+                });
+                
+                try {
+                    const precioTotal = calcularPrecioTotal(
+                        alojamiento, 
+                        datos.fechaEntrada, 
+                        datos.noches
+                    );
+                    
+                    await bot.sendMessage(remitente, { 
+                        text: `💵 *Precio total:* $${precioTotal}\n\n📄 *¿Aceptas las condiciones de uso?* (responde *sí* o *no*)` 
+                    });
+                    
+                    await establecerEstado(remitente, ESTADOS_RESERVA.CONDICIONES, {
+                        ...datos,
+                        personas: cantidad,
+                        alojamiento,
+                        precioTotal
+                    });
+                    
+                } catch (error) {
+                    console.error('Error cálculo precio:', error);
+                    await bot.sendMessage(remitente, { 
+                        text: '❌ Error calculando el precio. Intenta nuevamente' 
+                    });
+                }
+                break;
+            }
 
-            const precioTotal = calcularPrecioTotal(alojamiento, datos.fechaEntrada, noches);
-            console.log(`Precio total calculado: ${precioTotal}`);
-
-            await bot.sendMessage(remitente, { text: `El precio total para tu reserva es: $${precioTotal}` });
-            await bot.sendMessage(remitente, { text: '¿Leíste y aceptas las condiciones de uso? (responde sí/no)' });
-            await establecerEstado(remitente, ESTADOS_RESERVA.CONDICIONES, {
-                ...datos,
-                personas: cantidad,
-                alojamiento,
-                noches,
-                precioTotal
-            });
-            break;
-        }
-
-        case ESTADOS_RESERVA.ALOJAMIENTO: {
-            await bot.sendMessage(remitente, { text: '¿Leíste y aceptas las condiciones de uso? (responde sí/no)' });
-            await establecerEstado(remitente, ESTADOS_RESERVA.CONDICIONES, { ...datos, alojamiento: mensajeTexto });
-            break;
-        }
-
-        case ESTADOS_RESERVA.CONDICIONES: {
-            if (mensajeTexto.toLowerCase() === 'sí' || mensajeTexto.toLowerCase() === 'si') {
-                const resumen =
-`📝 Nueva Solicitud de Reserva
-Nombre: ${datos.nombre}
-Teléfono: ${datos.telefono}
-Personas: ${datos.personas}
-Alojamiento: ${datos.alojamiento}
-Fechas: ${datos.fechaEntrada} - ${datos.fechaSalida} (${datos.noches} noches)
-Total a pagar: $${datos.precioTotal}
-Para confirmar:`;
-
+            case ESTADOS_RESERVA.CONDICIONES: {
+                const aceptado = /^s[iíí]$/i.test(mensajeTexto.trim());
+                
+                if (!aceptado) {
+                    await bot.sendMessage(remitente, { 
+                        text: '📝 Debes aceptar las condiciones para continuar\nResponde *"sí"* si estás de acuerdo' 
+                    });
+                    return;
+                }
+                
+                const resumen = `
+📋 *NUEVA SOLICITUD DE RESERVA*
+--------------------------------
+• 👤 *Nombre:* ${datos.nombre}
+• 📱 *Teléfono:* ${datos.telefono}
+• 👥 *Personas:* ${datos.personas}
+• 🏠 *Alojamiento:* ${datos.alojamiento}
+• 📅 *Fechas:* ${datos.fechaEntrada} - ${datos.fechaSalida} (${datos.noches} noches)
+• 💰 *Total:* $${datos.precioTotal}
+--------------------------------
+✅ *Para confirmar:* 
+\`/confirmar ${datos.telefono}\`
+                `;
+                
                 await enviarAlGrupo(bot, resumen);
-
-                // Enviar comando /confirmar en mensaje separado para facilitar copia
-                const comandoConfirmar = `/confirmar ${datos.telefono}`;
-                await enviarAlGrupo(bot, comandoConfirmar);
-
-                // Reservation saving is now handled only after /confirmar command from group
-                await bot.sendMessage(remitente, { text: 'Tu reserva ha sido enviada al grupo para confirmación. Espera el comando /confirmar para guardar la reserva.' });
-
-                await establecerEstado(remitente, ESTADOS_RESERVA.ESPERANDO_PAGO, { ...datos, condiciones: mensajeTexto });
-            } else {
-                await bot.sendMessage(remitente, { text: 'Debes aceptar las condiciones para continuar.' });
+                await bot.sendMessage(remitente, { 
+                    text: '📤 Reserva enviada para confirmación\n\n💳 *Por favor envía tu comprobante de pago:*' 
+                });
+                
+                await establecerEstado(remitente, ESTADOS_RESERVA.ESPERANDO_PAGO, datos);
+                break;
             }
-            break;
-        }
 
-        case ESTADOS_RESERVA.ESPERANDO_PAGO: {
-            if (mensaje.imageMessage || mensaje.documentMessage) {
+            case ESTADOS_RESERVA.ESPERANDO_PAGO: {
+                const esComprobante = mensaje.imageMessage || mensaje.documentMessage;
+                
+                if (!esComprobante) {
+                    await bot.sendMessage(remitente, { 
+                        text: '📎 Por favor envía una *foto* o *PDF* del comprobante' 
+                    });
+                    return;
+                }
+                
                 await reenviarComprobanteAlGrupo(bot, mensaje, datos);
-                await bot.sendMessage(remitente, { text: '¡Comprobante recibido! Un administrador confirmará tu reserva pronto.' });
+                await bot.sendMessage(remitente, { 
+                    text: '✅ Comprobante recibido\n\n⏳ *Un administrador confirmará tu reserva pronto*' 
+                });
+                
                 await establecerEstado(remitente, ESTADOS_RESERVA.ESPERANDO_CONFIRMACION, datos);
-            } else {
-                await bot.sendMessage(remitente, { text: 'Por favor, envía una foto o PDF del comprobante de pago.' });
+                break;
             }
-            break;
-        }
 
-        case ESTADOS_RESERVA.ESPERANDO_CONFIRMACION: {
-            await bot.sendMessage(remitente, { text: 'Tu reserva está siendo confirmada. Por favor espera.' });
-            break;
-        }
+            case ESTADOS_RESERVA.ESPERANDO_CONFIRMACION: {
+                await bot.sendMessage(remitente, { 
+                    text: '⏳ Tu reserva está en proceso de confirmación\nTe notificaremos cuando esté lista' 
+                });
+                break;
+            }
 
-        default:
-            // Not handled here
-            break;
+            // Estado TELEFONO eliminado por redundancia
+        }
+    } catch (error) {
+        console.error('Error en handleReservaState:', error);
+        await bot.sendMessage(remitente, { 
+            text: '⚠️ Ocurrió un error inesperado. Por favor intenta nuevamente' 
+        });
+        await establecerEstado(remitente, 'MENU_PRINCIPAL');
     }
 }
 
-module.exports = {
-    handleReservaState
-};
+module.exports = { handleReservaState };

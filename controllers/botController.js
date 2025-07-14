@@ -1,8 +1,3 @@
-/**
- * Controlador para iniciar el bot WhatsApp usando directamente la librería baileys,
- * sin usar '@bot-whatsapp/bot' para evitar problemas con la API desconocida.
- */
-
 const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const qrcodeTerminal = require('qrcode-terminal');
 const qrcode = require('qrcode');
@@ -10,9 +5,27 @@ const fs = require('fs');
 const path = require('path');
 const { procesarMensaje } = require('./messageHandler');
 
+// Variables globales para control de reconexión
+let reconnectAttempts = 0;
+let isReconnecting = false;
+
 async function startBot() {
   try {
-    const { state, saveCreds } = await useMultiFileAuthState(path.join('data', 'session'));
+    // Crear directorios necesarios si no existen
+    const dataDir = path.join('data');
+    const sessionDir = path.join(dataDir, 'session');
+    
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir);
+      console.log('Directorio data creado');
+    }
+    
+    if (!fs.existsSync(sessionDir)) {
+      fs.mkdirSync(sessionDir);
+      console.log('Directorio session creado');
+    }
+
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
     const bot = makeWASocket({
       auth: state,
@@ -21,77 +34,114 @@ async function startBot() {
       mobile: false
     });
 
-    bot.ev.on('connection.update', (update) => {
-      console.log('Connection update event:', JSON.stringify(update, null, 2));
-      if (update.qr) {
-        console.log('QR code event received');
-        qrcodeTerminal.generate(update.qr, { small: true });
-
-        const qrPngPath = path.join('data', 'qr_code.png');
-        qrcode.toFile(qrPngPath, update.qr, { type: 'png' }, (err) => {
-          if (err) {
-            console.error('Error generating QR code PNG:', err);
-          } else {
-            console.log(`QR code PNG saved to file: ${qrPngPath}`);
+    // Función optimizada para reconexión
+    const scheduleReconnect = (deleteSession = false) => {
+      if (isReconnecting) return;
+      
+      isReconnecting = true;
+      const baseDelay = 3000;
+      const maxDelay = 30000;
+      const delay = Math.min(baseDelay * Math.pow(2, reconnectAttempts), maxDelay);
+      
+      console.log(`⏳ Reconectando en ${delay/1000} segundos... (Intento ${reconnectAttempts + 1})`);
+      
+      setTimeout(async () => {
+        if (deleteSession) {
+          console.log('🔑 Eliminando sesión inválida...');
+          try {
+            fs.rmSync(sessionDir, { recursive: true, force: true });
+            console.log('✅ Sesión eliminada correctamente');
+          } catch (deleteError) {
+            console.error('❌ Error eliminando sesión:', deleteError);
           }
+        }
+        
+        isReconnecting = false;
+        reconnectAttempts++;
+        await startBot();
+      }, delay);
+    };
+
+    bot.ev.on('connection.update', (update) => {
+      console.log('🔄 Estado de conexión:', update.connection || 'actualización');
+      
+      // Manejo de QR Code
+      if (update.qr) {
+        console.log('📲 Escanea el código QR para iniciar sesión');
+        qrcodeTerminal.generate(update.qr, { small: true });
+        
+        const qrPngPath = path.join(dataDir, 'qr_code.png');
+        qrcode.toFile(qrPngPath, update.qr, (err) => {
+          console.log(err 
+            ? `❌ Error generando QR: ${err}`
+            : `✅ QR guardado en: ${qrPngPath}`
+          );
         });
       }
-      if (update.connection) {
-        console.log('Connection update:', update.connection);
+      
+      // Resetear intentos al conectar exitosamente
+      if (update.connection === 'open') {
+        reconnectAttempts = 0;
+        console.log('✅ Conexión establecida con WhatsApp');
       }
-      if (update.lastDisconnect) {
-        console.log('Last disconnect info:', JSON.stringify(update.lastDisconnect, null, 2));
-        const statusCode = update.lastDisconnect.error?.output?.statusCode || update.lastDisconnect.statusCode;
-        const reason = update.lastDisconnect.error?.output?.payload?.reason || '';
-        console.log('Last disconnect status code:', statusCode);
-        console.log('Last disconnect reason:', reason);
-        if (statusCode === 401 || reason === 'invalid_session') {
-          console.log('Unauthorized or invalid session, deleting session and restarting...');
-          const sessionPath = path.join('data', 'session');
-          fs.rm(sessionPath, { recursive: true, force: true }, (err) => {
-            if (err) {
-              console.error('Error deleting session files:', err);
-            } else {
-              console.log('Session files deleted successfully.');
-            }
-            setTimeout(startBot, 3000);
-          });
-          return;
-        }
-      }
+      
+      // Manejo de desconexiones
       if (update.connection === 'close') {
-        console.log('Connection closed, restarting bot in 3 seconds...');
-        setTimeout(startBot, 3000);
+        const statusCode = update.lastDisconnect?.error?.output?.statusCode || 
+                           update.lastDisconnect?.statusCode;
+        
+        const reason = update.lastDisconnect?.error?.output?.payload?.reason || 
+                       update.lastDisconnect?.reason || '';
+
+        console.log('⚠️ Desconectado:', `Código: ${statusCode}`, `Razón: ${reason}`);
+        
+        if (statusCode === 401 || reason.includes('invalid')) {
+          scheduleReconnect(true);  // Borrar sesión y reconectar
+        } else {
+          scheduleReconnect();      // Reconexión simple
+        }
       }
     });
 
     bot.ev.on('creds.update', saveCreds);
 
     bot.ev.on('messages.upsert', async ({ messages }) => {
-      console.log('Mensaje recibido:', messages);
-      const msg = messages[0];
-      if (!msg.key.fromMe && msg.message) {
-        const remitente = msg.key.remoteJid;
-        let texto = '';
-
-        if (msg.message.conversation) {
-          texto = msg.message.conversation.trim();
-        } else if (msg.message.extendedTextMessage) {
-          texto = msg.message.extendedTextMessage.text.trim();
+      try {
+        // Validar existencia de mensajes
+        if (!messages || messages.length === 0) return;
+        
+        const msg = messages[0];
+        const isFromMe = msg.key.fromMe || false;
+        
+        // Solo procesar mensajes entrantes válidos
+        if (!isFromMe && msg.message) {
+          const remitente = msg.key.remoteJid;
+          let texto = '';
+          
+          // Extraer contenido según tipo de mensaje
+          if (msg.message.conversation) {
+            texto = msg.message.conversation.trim();
+          } 
+          else if (msg.message.extendedTextMessage?.text) {
+            texto = msg.message.extendedTextMessage.text.trim();
+          }
+          // Agregar aquí otros tipos de mensaje si son necesarios
+          
+          if (texto) {
+            console.log(`📩 Mensaje recibido de ${remitente}: ${texto}`);
+            await procesarMensaje(bot, remitente, texto, msg.message);
+          }
         }
-
-        if (texto) {
-          await procesarMensaje(bot, remitente, texto, msg.message);
-        }
+      } catch (processingError) {
+        console.error('❌ Error procesando mensaje:', processingError);
       }
     });
 
-    console.log('🔔 BOT INICIADO - ESCANEE EL CÓDIGO QR');
-  } catch (error) {
-    console.error('Error al iniciar el bot:', error);
+    console.log('🚀 Bot iniciado correctamente');
+  } catch (startError) {
+    console.error('⛔ Error crítico al iniciar bot:', startError);
+    scheduleReconnect();
   }
 }
 
-module.exports = {
-  startBot,
-};
+module.exports = { startBot };
