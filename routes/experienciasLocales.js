@@ -1,113 +1,197 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 const { addKeyword } = require('@bot-whatsapp/bot');
 
 const ACTIVIDADES_PATH = path.join(__dirname, 'actividades.json');
 
-const loadActividades = () => {
+// Cache para actividades
+let actividadesCache = null;
+let lastFetch = 0;
+const CACHE_DURATION = 300000; // 5 minutos en ms
+
+async function loadActividades() {
+  // Usar cache si está vigente
+  if (actividadesCache && Date.now() - lastFetch < CACHE_DURATION) {
+    return actividadesCache;
+  }
+  
   try {
-    const data = fs.readFileSync(ACTIVIDADES_PATH, 'utf8');
-    return JSON.parse(data);
+    const data = await fs.readFile(ACTIVIDADES_PATH, 'utf8');
+    actividadesCache = JSON.parse(data);
+    lastFetch = Date.now();
+    return actividadesCache;
   } catch (e) {
-    console.error('Error loading actividades.json:', e);
+    console.error('Error cargando actividades:', e);
     return [];
   }
+}
+
+// Formateador seguro para valores
+const safeValue = (value, defaultValue = 'N/A') => {
+  if (value === null || value === undefined || value === '') return defaultValue;
+  if (Array.isArray(value) return value.length > 0 ? value.join(', ') : defaultValue;
+  return value;
 };
 
-async function handleExperienciasLocales(bot, remitente, mensaje, establecerEstado) {
-  const actividades = loadActividades();
-  if (actividades.length === 0) {
-    await bot.sendMessage(remitente, { text: '⚠️ No hay actividades disponibles en este momento.' });
-    return;
+// Generador de detalles de actividad
+function formatActivityDetails(actividad) {
+  const sections = [];
+  
+  // Cabecera
+  sections.push(`📌 *${safeValue(actividad.nombre)}*`);
+  if (actividad.categoria || actividad.subcategoria) {
+    sections.push(`(${safeValue(actividad.categoria)} - ${safeValue(actividad.subcategoria)})\n`);
   }
-  if (!mensaje || mensaje === '3') {
-    // Show menu
-    let menu = '📋 *Experiencias Locales*:\n';
-    actividades.forEach((actividad, index) => {
-      menu += `${index + 1}. ${actividad.nombre}\n`;
-    });
-    menu += 'Por favor, selecciona el número o nombre de la actividad para ver más detalles.';
-    await bot.sendMessage(remitente, { text: menu });
-    await establecerEstado(remitente, 'experienciasLocales');
-  } else {
-    // Handle selection by number or name/id
-    const input = mensaje.trim().toLowerCase();
-
-    let actividad = null;
-
-    // Try to parse as number index
-    const seleccionNum = parseInt(input);
-    if (!isNaN(seleccionNum) && seleccionNum >= 1 && seleccionNum <= actividades.length) {
-      actividad = actividades[seleccionNum - 1];
-    } else {
-      // Try to find by id or name (case insensitive)
-      actividad = actividades.find(act =>
-        act.id.toLowerCase() === input ||
-        act.nombre.toLowerCase() === input
-      );
+  
+  // Descripción
+  sections.push(`📝 *Descripción:*\n${safeValue(actividad.descripcion)}\n`);
+  
+  // Ubicación
+  if (actividad.ubicacion) {
+    sections.push('📍 *Ubicación:*');
+    sections.push(`Dirección: ${safeValue(actividad.ubicacion.direccion)}`);
+    sections.push(`Cómo llegar: ${safeValue(actividad.ubicacion.comoLlegar)}`);
+    sections.push(`Referencias: ${safeValue(actividad.ubicacion.referencias)}\n`);
+  }
+  
+  // Contacto
+  if (actividad.contacto) {
+    sections.push('📞 *Contacto:*');
+    sections.push(`Teléfono: ${safeValue(actividad.contacto.telefono)}`);
+    sections.push(`WhatsApp: ${safeValue(actividad.contacto.whatsapp)}`);
+    sections.push(`Email: ${safeValue(actividad.contacto.email)}`);
+    sections.push(`Sitio Web: ${safeValue(actividad.contacto.sitioWeb)}\n`);
+  }
+  
+  // Horarios
+  if (actividad.horarios) {
+    sections.push('⏰ *Horarios:*');
+    sections.push(`General: ${safeValue(actividad.horarios.general)}`);
+    sections.push(`Reservas: ${safeValue(actividad.horarios.reservas)}`);
+    sections.push(`Duración: ${safeValue(actividad.horarios.duracion || actividad.duracion)}\n`);
+  }
+  
+  // Precios/Menú
+  if (actividad.precios) {
+    sections.push('💰 *Precios:*');
+    sections.push(`Adulto: ${safeValue(actividad.precios.adulto)} ${safeValue(actividad.precios.moneda)}`);
+    sections.push(`Niño: ${safeValue(actividad.precios.nino)} ${safeValue(actividad.precios.moneda)}`);
+    sections.push(`Descuento grupo: ${safeValue(actividad.precios.descuentoGrupo)}% para mínimo ${safeValue(actividad.precios.grupoMinimo)} personas`);
+    sections.push(`Incluye: ${safeValue(actividad.precios.incluye)}\n`);
+  } else if (actividad.menu) {
+    sections.push('💰 *Menú y Precios:*');
+    sections.push(`Especialidades: ${safeValue(actividad.menu.especialidades)}`);
+    if (actividad.menu.rangoPrecio) {
+      sections.push('Rango de precios:');
+      sections.push(`  Entradas: ${safeValue(actividad.menu.rangoPrecio.entradas)}`);
+      sections.push(`  Platillos principales: ${safeValue(actividad.menu.rangoPrecio.platillosPrincipales)}`);
+      sections.push(`  Postres: ${safeValue(actividad.menu.rangoPrecio.postres)}`);
+      sections.push(`  Bebidas: ${safeValue(actividad.menu.rangoPrecio.bebidas)}`);
     }
+    sections.push(`Opciones especiales: ${safeValue(actividad.menu.opcionesEspeciales)}\n`);
+  }
+  
+  // Servicios
+  if (actividad.servicios) {
+    sections.push(`🛎️ *Servicios:*\n${safeValue(actividad.servicios)}\n`);
+  }
+  
+  // Detalles actividad
+  const activityDetails = [
+    `🎯 *Dificultad:* ${safeValue(actividad.dificultad)}`,
+    `Edad mínima: ${safeValue(actividad.edadMinima)}`,
+    `Capacidad máxima: ${safeValue(actividad.capacidadMaxima)}`
+  ].filter(Boolean).join('\n');
+  
+  if (activityDetails) sections.push(activityDetails + '\n');
+  
+  // Disponibilidad
+  if (actividad.disponibilidad) {
+    sections.push('📅 *Disponibilidad:*');
+    sections.push(`Temporada alta: ${safeValue(actividad.disponibilidad.temporadaAlta)}`);
+    sections.push(`Temporada baja: ${safeValue(actividad.disponibilidad.temporadaBaja)}`);
+    sections.push(`Días cerrados: ${safeValue(actividad.disponibilidad.diasCerrado)}`);
+    sections.push(`Clima ideal: ${safeValue(actividad.disponibilidad.climaIdeal)}\n`);
+  }
+  
+  // Multimedia
+  if (actividad.multimedia) {
+    sections.push('📸 *Multimedia:*');
+    sections.push(`Foto principal: ${safeValue(actividad.multimedia.fotoPrincipal)}`);
+    if (actividad.multimedia.galeria) {
+      sections.push(`Galería:\n${actividad.multimedia.galeria.map(item => `• ${item}`).join('\n')}`);
+    }
+    sections.push(`Video: ${safeValue(actividad.multimedia.video)}\n`);
+  }
+  
+  // Calificación
+  if (actividad.calificacion) {
+    sections.push(`⭐ *Calificación promedio:* ${safeValue(actividad.calificacion.promedio)} (${safeValue(actividad.calificacion.totalResenas)} reseñas)\n`);
+  }
+  
+  // Certificaciones e Idiomas
+  if (actividad.certificaciones) {
+    sections.push(`📜 *Certificaciones:*\n${safeValue(actividad.certificaciones)}\n`);
+  }
+  if (actividad.idiomas) {
+    sections.push(`🗣️ *Idiomas disponibles:* ${safeValue(actividad.idiomas)}\n`);
+  }
+  
+  // Recomendaciones
+  if (actividad.recomendaciones) {
+    sections.push('🔖 *Recomendaciones:*');
+    sections.push(`Qué traer: ${safeValue(actividad.recomendaciones.queTraer)}`);
+    sections.push(`No recomendado: ${safeValue(actividad.recomendaciones.noRecomendado)}`);
+    sections.push(`Consejos: ${safeValue(actividad.recomendaciones.consejos)}\n`);
+  }
+  
+  // Pie
+  sections.push('Escribe "menu" para volver al menú principal.');
+  
+  return sections.join('\n');
+}
 
+async function handleExperienciasLocales(bot, remitente, mensaje, establecerEstado) {
+  try {
+    const actividades = await loadActividades();
+    
+    if (!actividades.length) {
+      await bot.sendMessage(remitente, { text: '⚠️ No hay actividades disponibles en este momento.' });
+      return;
+    }
+    
+    if (!mensaje || mensaje === '3') {
+      // Mostrar menú
+      const menuItems = actividades.map((act, index) => `${index + 1}. ${act.nombre}`).join('\n');
+      const menuMessage = `📋 *Experiencias Locales*:\n${menuItems}\n\nPor favor, selecciona el número o nombre de la actividad.`;
+      
+      await bot.sendMessage(remitente, { text: menuMessage });
+      await establecerEstado(remitente, 'experienciasLocales');
+      return;
+    }
+    
+    // Buscar actividad
+    const input = mensaje.trim().toLowerCase();
+    const numSelection = parseInt(input);
+    
+    const actividad = Number.isInteger(numSelection) && numSelection > 0 && numSelection <= actividades.length
+      ? actividades[numSelection - 1]
+      : actividades.find(act => 
+          act.id?.toLowerCase() === input || 
+          act.nombre?.toLowerCase() === input
+        );
+    
     if (!actividad) {
       await bot.sendMessage(remitente, { text: '⚠️ Selección inválida. Por favor, ingresa un número o nombre válido del menú.' });
       return;
     }
-
-    let detalles = `📌 *${actividad.nombre}* (${actividad.categoria} - ${actividad.subcategoria})\n\n`;
-
-    detalles += `📝 *Descripción:*\n${actividad.descripcion}\n\n`;
-
-    detalles += `📍 *Ubicación:*\nDirección: ${actividad.ubicacion.direccion}\nCómo llegar: ${actividad.ubicacion.comoLlegar}\nReferencias: ${actividad.ubicacion.referencias}\n\n`;
-
-    detalles += `📞 *Contacto:*\nTeléfono: ${actividad.contacto.telefono}\nWhatsApp: ${actividad.contacto.whatsapp}\nEmail: ${actividad.contacto.email}\nSitio Web: ${actividad.contacto.sitioWeb}\n\n`;
-
-    detalles += `⏰ *Horarios:*\nGeneral: ${actividad.horarios.general}\nReservas: ${actividad.horarios.reservas}\nDuración: ${actividad.horarios.duracion || actividad.duracion || 'N/A'}\n\n`;
-
-    if (actividad.precios && typeof actividad.precios === 'object') {
-      const adulto = actividad.precios.adulto ?? 'N/A';
-      const nino = actividad.precios.nino ?? 'N/A';
-      const descuentoGrupo = actividad.precios.descuentoGrupo ?? 'N/A';
-      const grupoMinimo = actividad.precios.grupoMinimo ?? 'N/A';
-      const incluye = Array.isArray(actividad.precios.incluye) ? actividad.precios.incluye.join(', ') : 'N/A';
-      const moneda = actividad.precios.moneda ?? '';
-      detalles += `💰 *Precios:*\nAdulto: ${adulto} ${moneda}\nNiño: ${nino} ${moneda}\nDescuento grupo: ${descuentoGrupo}% para mínimo ${grupoMinimo} personas\nIncluye: ${incluye}\n\n`;
-    } else if (actividad.menu && typeof actividad.menu === 'object') {
-      const especialidades = Array.isArray(actividad.menu.especialidades) ? actividad.menu.especialidades.join(', ') : 'N/A';
-      const entradas = actividad.menu.rangoPrecio?.entradas ?? 'N/A';
-      const platillosPrincipales = actividad.menu.rangoPrecio?.platillosPrincipales ?? 'N/A';
-      const postres = actividad.menu.rangoPrecio?.postres ?? 'N/A';
-      const bebidas = actividad.menu.rangoPrecio?.bebidas ?? 'N/A';
-      const opcionesEspeciales = Array.isArray(actividad.menu.opcionesEspeciales) ? actividad.menu.opcionesEspeciales.join(', ') : 'N/A';
-      detalles += `💰 *Menú y Precios:*\nEspecialidades: ${especialidades}\nRango de precios:\nEntradas: ${entradas}\nPlatillos principales: ${platillosPrincipales}\nPostres: ${postres}\nBebidas: ${bebidas}\nOpciones especiales: ${opcionesEspeciales}\n\n`;
-    } else {
-      detalles += `💰 *Precios:* Información no disponible.\n\n`;
-    }
-
-    detalles += `🛎️ *Servicios:*\n${actividad.servicios.join(', ')}\n\n`;
-
-    detalles += `🎯 *Dificultad:* ${actividad.dificultad}\nEdad mínima: ${actividad.edadMinima}\nCapacidad máxima: ${actividad.capacidadMaxima}\n\n`;
-
-    detalles += `📅 *Disponibilidad:*\nTemporada alta: ${actividad.disponibilidad.temporadaAlta}\nTemporada baja: ${actividad.disponibilidad.temporadaBaja}\nDías cerrados: ${actividad.disponibilidad.diasCerrado.join(', ')}\nClima ideal: ${actividad.disponibilidad.climaIdeal}\n\n`;
-
-    detalles += `📸 *Multimedia:*\nFoto principal: ${actividad.multimedia.fotoPrincipal}\nGalería:\n${actividad.multimedia.galeria.join('\n')}\nVideo: ${actividad.multimedia.video}\n\n`;
-
-    detalles += `⭐ *Calificación promedio:* ${actividad.calificacion.promedio} (${actividad.calificacion.totalResenas} reseñas)\n\n`;
-
-    detalles += `📜 *Certificaciones:*\n${actividad.certificaciones.join(', ')}\n\n`;
-
-    detalles += `🗣️ *Idiomas disponibles:* ${actividad.idiomas.join(', ')}\n\n`;
-
-    if (actividad.recomendaciones && typeof actividad.recomendaciones === 'object') {
-      const queTraer = Array.isArray(actividad.recomendaciones.queTraer) ? actividad.recomendaciones.queTraer.join(', ') : 'N/A';
-      const noRecomendado = Array.isArray(actividad.recomendaciones.noRecomendado) ? actividad.recomendaciones.noRecomendado.join(', ') : 'N/A';
-      const consejos = actividad.recomendaciones.consejos ?? 'N/A';
-      detalles += `🔖 *Recomendaciones:*\nQué traer: ${queTraer}\nNo recomendado: ${noRecomendado}\nConsejos: ${consejos}\n\n`;
-    } else {
-      detalles += `🔖 *Recomendaciones:* Información no disponible.\n\n`;
-    }
-
-    detalles += `Escribe "menu" para volver al menú principal.`;
-
+    
+    const detalles = formatActivityDetails(actividad);
     await bot.sendMessage(remitente, { text: detalles });
+    
+  } catch (error) {
+    console.error('Error en handleExperienciasLocales:', error);
+    await bot.sendMessage(remitente, { text: '⚠️ Ocurrió un error al procesar tu solicitud. Por favor, intenta más tarde.' });
   }
 }
 

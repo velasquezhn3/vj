@@ -1,26 +1,49 @@
-/**
- * Flujo para manejar la sección de Contacto Rápido.
- */
+const { addKeyword } = require('@bot-whatsapp/bot');
 
-const { addKeyword, addAnswer } = require('@bot-whatsapp/bot');
+// Datos estructurados para fácil mantenimiento
+const CONTACTOS = {
+  oficina: {
+    horario: "Horario De Oficina",
+    whatsapp: "50499905880",
+    llamadas: "99905880"
+  },
+  emergencias: [
+    {
+      whatsapp: "+50499222188",
+      llamadas: "99222188"
+    },
+    {
+      whatsapp: "+50499905880",
+      llamadas: "96870847"
+    }
+  ],
+  ubicacion: {
+    texto: "Tela Atlantida",
+    mapa: "https://tinyurl.com/VillasJulie"
+  }
+};
 
-const flowContactoRapido = addKeyword(['5', 'contacto rápido', 'contacto rapido'])
-  .addAnswer(
-    `📞 *Horario De Oficina:*  
-WhatsApp: 50499905880  
-Llamadas: 99905880
+// Genera dinámicamente el texto de contactos
+const formatContactos = () => {
+  let texto = `📞 *${CONTACTOS.oficina.horario}:*\n`;
+  texto += `WhatsApp: ${CONTACTOS.oficina.whatsapp}\n`;
+  texto += `Llamadas: ${CONTACTOS.oficina.llamadas}\n\n`;
 
-📞 *Atención 24/7:*  
-WhatsApp: +50499222188  
-Llamadas: 99222188
+  CONTACTOS.emergencias.forEach((contacto, index) => {
+    texto += `📞 *Atención 24/7 ${CONTACTOS.emergencias.length > 1 ? `(${index + 1})` : ''}:*\n`;
+    texto += `WhatsApp: ${contacto.whatsapp}\n`;
+    texto += `Llamadas: ${contacto.llamadas}\n\n`;
+  });
 
-📞 *Atención 24/7:*  
-WhatsApp: +50499905880  
-Llamadas: 96870847
+  texto += `📍 *Ubicación:*\n${CONTACTOS.ubicacion.texto}\n`;
+  texto += `(Maps: ${CONTACTOS.ubicacion.mapa})`;
 
-📍 *Ubicación:*  
-Tela Atlantida
-(Maps: [ https://tinyurl.com/VillasJulie ])`
-  );
+  return texto;
+};
+
+const flowContactoRapido = addKeyword(
+  ['5', 'contacto rápido', 'contacto rapido', 'contacto', 'rapido'],
+  { sensitive: true }  // Hacer insensible a mayúsculas/minúsculas
+).addAnswer(formatContactos());
 
 module.exports = flowContactoRapido;

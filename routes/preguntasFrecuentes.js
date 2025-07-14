@@ -1,55 +1,85 @@
-/**
- * Flujo para manejar la sección de Preguntas Frecuentes.
- */
+const { addKeyword } = require('@bot-whatsapp/bot');
 
-const { addKeyword, addAnswer } = require('@bot-whatsapp/bot');
+// Estructura de datos para preguntas frecuentes
+const FAQS = [
+  {
+    id: 1,
+    icon: "🏡",
+    question: "¿Qué tipos de alojamientos ofrecen?",
+    answer: "Ofrecemos cabañas y apartamentos equipados, con vista al mar y acceso directo a la playa. Contamos con opciones para parejas, familias o grupos pequeños."
+  },
+  {
+    id: 2,
+    icon: "🕒",
+    question: "¿A qué hora es el check-in y check-out?",
+    answer: "• Check-in: A partir de las 2:00 PM\n• Check-out: Hasta las 11:00 AM"
+  },
+  {
+    id: 3,
+    icon: "💵",
+    question: "¿Cuáles son las tarifas por noche?",
+    answer: "Las tarifas varían según:\n- Temporada\n- Tipo de alojamiento\n- Número de personas\n\nContáctanos con tus fechas para una cotización personalizada."
+  },
+  {
+    id: 4,
+    icon: "👨‍👩‍👧",
+    question: "¿Se permiten niños y mascotas?",
+    answer: "• Niños: ¡Bienvenidos!\n• Mascotas: Permitidas en algunas cabañas bajo condiciones específicas. Consulta antes de reservar."
+  },
+  {
+    id: 5,
+    icon: "🍳",
+    question: "¿Las cabañas tienen cocina?",
+    answer: "Sí, todas incluyen cocina equipada con:\n- Refrigeradora\n- Estufa\n- Utensilios básicos"
+  },
+  {
+    id: 6,
+    icon: "🏖️",
+    question: "¿Qué servicios están incluidos?",
+    answer: "• Aire acondicionado\n• Wi-Fi\n• Parqueo privado\n• Acceso directo a playa\n• Áreas de descanso con hamacas\n• Piscina (en unidades seleccionadas)"
+  },
+  {
+    id: 7,
+    icon: "📍",
+    question: "¿Dónde están ubicados?",
+    answer: "Estamos en Tela, Atlántida, justo frente al mar, en una zona segura y tranquila.\n\n📍 Ubicación: [Ver en Maps](https://tinyurl.com/VillasJulie)"
+  },
+  {
+    id: 8,
+    icon: "📅",
+    question: "¿Cómo puedo reservar?",
+    answer: "Escríbenos por WhatsApp indicando:\n- Fechas de entrada/salida\n- Número de personas\n- Si viajas con niños/mascotas\n\nTe confirmaremos disponibilidad y precio."
+  },
+  {
+    id: 9,
+    icon: "💳",
+    question: "¿Qué formas de pago aceptan?",
+    answer: "Aceptamos:\n- Efectivo (HNL)\n- Transferencias bancarias\n- Pago móvil (Tigo Money, etc.)"
+  },
+  {
+    id: 10,
+    icon: "🔒",
+    question: "¿Se requiere depósito para reservar?",
+    answer: "Sí, requerimos:\n• 50% de adelanto para garantizar la reserva\n• 50% restante al llegar"
+  }
+];
 
-const flowPreguntasFrecuentes = addKeyword(['8', 'preguntas frecuentes', 'faq'])
-  .addAnswer(
-    `A🏝️ Preguntas Frecuentes – Villas frente al mar
-1. 🏡 ¿Qué tipos de alojamientos ofrecen?
-Ofrecemos cabañas y apartamentos equipados, con vista al mar y acceso directo a la playa. Contamos con opciones para parejas, familias o grupos pequeños.
+// Generar mensaje de FAQ con formato mejorado
+const generateFAQMessage = () => {
+  let message = "🏝️ *PREGUNTAS FRECUENTES - Villas Julie*\n\n";
+  
+  FAQS.forEach(faq => {
+    message += `${faq.id}. ${faq.icon} *${faq.question}*\n${faq.answer}\n\n`;
+  });
+  
+  message += "💬 ¿Necesitas más información? Escribe tu pregunta o selecciona un número.";
+  
+  return message;
+};
 
-2. 🕒 ¿A qué hora es el check-in y check-out?
-Check-in: A partir de las 2:00 PM
-Check-out: Hasta las 11:00 AM
-
-3. 💵 ¿Cuáles son las tarifas por noche?
-Las tarifas varían según la temporada, tipo de alojamiento y número de personas. Contáctanos con las fechas exactas para enviarte una cotización personalizada.
-
-4. 👨‍👩‍👧 ¿Se permiten niños y mascotas?
-Niños: ¡Bienvenidos!
-Mascotas: Permitidas en algunas cabañas bajo ciertas condiciones. Por favor consulta antes de reservar.
-
-5. 🍳 ¿Las cabañas tienen cocina?
-Sí, nuestras cabañas y apartamentos cuentan con cocina equipada (refrigeradora, estufa, utensilios básicos).
-
-6. 🏖️ ¿Qué servicios están incluidos?
-Aire acondicionado
-Wi-Fi
-Parqueo privado
-Acceso directo a la playa
-Áreas de descanso y hamacas
-Piscina (si aplica)
-
-7. 📍 ¿Dónde están ubicados?
-Estamos en Tela, Atlántida, justo frente al mar, en una zona segura y tranquila, ideal para descansar.
-
-8. 📅 ¿Cómo puedo reservar?
-Puedes escribirnos directamente por WhatsApp, indicándonos:
-Fechas de entrada y salida
-Número de personas
-Si viajas con niños o mascotas
-Te confirmaremos disponibilidad y precio.
-
-9. 💳 ¿Qué formas de pago aceptan?
-Aceptamos:
-Efectivo
-Transferencias bancarias
-Pago por Tigo Money o similar
-
-10. 🔒 ¿Se requiere depósito para reservar?
-Sí, para garantizar tu reserva solicitamos un adelanto del 50% del total. El resto se paga al llegar.`
-  );
+const flowPreguntasFrecuentes = addKeyword(
+  ['8', 'preguntas frecuentes', 'faq', 'preguntas', 'frecuentes', 'dudas'],
+  { sensitive: true } // Insensible a mayúsculas/minúsculas
+).addAnswer(generateFAQMessage());
 
 module.exports = flowPreguntasFrecuentes;
