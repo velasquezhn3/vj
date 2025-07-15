@@ -29,7 +29,7 @@ async function loadActividades() {
 // Formateador seguro para valores
 const safeValue = (value, defaultValue = 'N/A') => {
   if (value === null || value === undefined || value === '') return defaultValue;
-  if (Array.isArray(value) return value.length > 0 ? value.join(', ') : defaultValue;
+  if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : defaultValue;
   return value;
 };
 

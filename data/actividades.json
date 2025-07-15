@@ -73,12 +73,13 @@
       "climaIdeal": "Seco y soleado"
     },
     "multimedia": {
-      "fotoPrincipal": "https://ejemplo.com/senderismo-principal.jpg",
+      "fotoPrincipal": "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_4_e9prqi.jpg",
       "galeria": [
-        "https://ejemplo.com/sendero1.jpg",
-        "https://ejemplo.com/vista-mar.jpg",
-        "https://ejemplo.com/flora.jpg",
-        "https://ejemplo.com/grupo-senderismo.jpg"
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_4_e9prqi.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_5_tlyprh.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_6_uhphdx.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_7_n3lnio.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_8_jmywru.jpg"
       ],
       "video": "https://ejemplo.com/senderismo-video.mp4"
     },
@@ -186,13 +187,13 @@
       "climaIdeal": "Cualquier clima (instalaciones cubiertas y abiertas)"
     },
     "multimedia": {
-      "fotoPrincipal": "https://ejemplo.com/mirador-principal.jpg",
+      "fotoPrincipal": "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_4_e9prqi.jpg",
       "galeria": [
-        "https://ejemplo.com/vista-atardecer.jpg",
-        "https://ejemplo.com/plato-langosta.jpg",
-        "https://ejemplo.com/terraza-noche.jpg",
-        "https://ejemplo.com/interior-restaurante.jpg",
-        "https://ejemplo.com/ceviche-especial.jpg"
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_4_e9prqi.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_5_tlyprh.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_6_uhphdx.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_7_n3lnio.jpg",
+      "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_8_jmywru.jpg"
       ],
       "video": "https://ejemplo.com/tour-restaurante.mp4"
     },
