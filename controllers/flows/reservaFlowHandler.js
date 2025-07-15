@@ -148,11 +148,10 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
 • 📅 *Fechas:* ${datos.fechaEntrada} - ${datos.fechaSalida} (${datos.noches} noches)
 • 💰 *Total:* $${datos.precioTotal}
 --------------------------------
-✅ *Para confirmar:* 
-\`/confirmar ${datos.telefono}\`
                 `;
                 
                 await enviarAlGrupo(bot, resumen);
+                await enviarAlGrupo(bot, `/confirmar ${datos.telefono}`);
                 await bot.sendMessage(remitente, { 
                     text: '📤 Reserva enviada para confirmación\n\n💳 *Por favor envía tu comprobante de pago:*' 
                 });
