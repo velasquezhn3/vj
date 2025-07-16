@@ -1,10 +1,11 @@
 const { establecerEstado } = require('../../services/stateService');
 const { calcularPrecioTotal } = require('../../services/reservaPriceService');
-const { enviarAlGrupo, reenviarComprobanteAlGrupo } = require('../../utils/utils');
-const Reserva = require('../../models/Reserva');
+const { enviarAlGrupo } = require('../../utils/utils');
+const { guardarComprobante } = require('../../services/comprobanteService');
+const { descargarMedia } = require('../../utils/mediaUtils');
+const { enviarReservaAlGrupo } = require('../../utils/grupoUtils');
 const { ESTADOS_RESERVA } = require('../reservaConstants');
 
-// Funciones auxiliares para mejorar la legibilidad
 const parsearFechas = (texto) => {
     const [entrada, salida] = texto.split('-').map(s => s.trim());
     return { entrada, salida };
@@ -28,10 +29,8 @@ const asignarAlojamiento = (personas) => {
 };
 
 async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje) {
-  console.log('[DEBUG] Estado recibido:', estado);
-  console.log('[DEBUG] Constante ESPERANDO_PAGO:', ESTADOS_RESERVA.ESPERANDO_PAGO);
-  try {
-    switch (estado) {
+    try {
+        switch (estado) {
             case ESTADOS_RESERVA.FECHAS: {
                 const { entrada, salida } = parsearFechas(mensajeTexto);
                 
@@ -52,7 +51,6 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                     return;
                 }
                 
-                // Simulación de disponibilidad (reemplazar con lógica real)
                 const disponible = true; 
                 
                 if (!disponible) {
@@ -141,68 +139,64 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                     return;
                 }
                 
-                const resumen = `
-📋 *NUEVA SOLICITUD DE RESERVA*
---------------------------------
-• 👤 *Nombre:* ${datos.nombre}
-• 📱 *Teléfono:* ${datos.telefono}
-• 👥 *Personas:* ${datos.personas}
-• 🏠 *Alojamiento:* ${datos.alojamiento}
-• 📅 *Fechas:* ${datos.fechaEntrada} - ${datos.fechaSalida} (${datos.noches} noches)
-• 💰 *Total:* $${datos.precioTotal}
---------------------------------
-                `;
+                const resumen = `\n📋 *NUEVA SOLICITUD DE RESERVA*\n--------------------------------\n• 👤 *Nombre:* ${datos.nombre}\n• 📱 *Teléfono:* ${datos.telefono}\n• 👥 *Personas:* ${datos.personas}\n• 🏠 *Alojamiento:* ${datos.alojamiento}\n• 📅 *Fechas:* ${datos.fechaEntrada} - ${datos.fechaSalida} (${datos.noches} noches)\n• 💰 *Total:* $${datos.precioTotal}\n--------------------------------\n                `;
                 
                 await enviarAlGrupo(bot, resumen);
                 await enviarAlGrupo(bot, `/confirmar ${datos.telefono}`);
                 await bot.sendMessage(remitente, { 
                     text: '📤 Reserva enviada para confirmación\n\n💳 *Por favor envía tu comprobante de pago:*' 
                 });
+
+                // Obtener la última reserva pendiente para este teléfono y agregar su ID a datos
+                const reservaPendiente = await require('../../services/alojamientosService').getLatestPendingReservation();
+                if (reservaPendiente) {
+                    datos.reservaId = reservaPendiente.reservation_id;
+                } else {
+                    console.error('No se encontró reserva pendiente para asignar ID en datos');
+                }
                 
-                await establecerEstado(remitente, ESTADOS_RESERVA.ESPERANDO_PAGO, {
-                    reservaId: datos.reservation_id,
-                    nombre: datos.nombre,
-                    telefono: datos.telefono
-                });
+                await establecerEstado(remitente, ESTADOS_RESERVA.ESPERANDO_PAGO, datos);
                 break;
             }
 
-case ESTADOS_RESERVA.ESPERANDO_PAGO: {
-    const esComprobante = mensaje.imageMessage || mensaje.documentMessage;
-    
-    if (!esComprobante) {
-        await bot.sendMessage(remitente, { 
-            text: '📎 Por favor envía una *foto* o *PDF* del comprobante' 
-        });
-        return;
-    }
-    
-    const rutaArchivo = await reenviarComprobanteAlGrupo(bot, mensaje, datos);
-    console.log('[DEBUG] reservation_id:', JSON.stringify(datos.reservation_id));
-    console.log('[DEBUG] rutaArchivo:', rutaArchivo ? rutaArchivo.toString() : rutaArchivo);
-    if (rutaArchivo) {
-        console.log('[DEBUG] Llamando updateComprobante con reservation_id:', datos.reservation_id, 'rutaArchivo:', rutaArchivo);
-        try {
-            const updatedReserva = await updateComprobante(datos.reservation_id, null, null, rutaArchivo);
-            console.log('[DEBUG] updateComprobante result:', updatedReserva);
-        } catch (error) {
-            console.error('[ERROR] updateComprobante fallo:', error);
-        }
-        try {
-            await bot.sendMessage(remitente, { 
-                text: "✅ Comprobante recibido y guardado\n\n⏳ *Un administrador confirmará tu reserva pronto*" 
-            });
-        } catch (error) {
-            console.error('[ERROR] Error enviando mensaje de confirmación:', error);
-        }
-        await establecerEstado(remitente, ESTADOS_RESERVA.ESPERANDO_CONFIRMACION, datos);
-    } else {
-        await bot.sendMessage(remitente, { 
-            text: "❌ Error guardando el comprobante. Por favor intenta nuevamente" 
-        });
-    }
-    break;
-}
+            case ESTADOS_RESERVA.ESPERANDO_PAGO: {
+                console.log('Mensaje completo recibido en ESPERANDO_PAGO:', JSON.stringify(mensaje));
+                console.log('Mensaje keys:', Object.keys(mensaje));
+                console.log('Mensaje tiene imageMessage:', mensaje.hasOwnProperty('imageMessage'));
+                console.log('Mensaje tiene documentMessage:', mensaje.hasOwnProperty('documentMessage'));
+                const esComprobante = mensaje.imageMessage || mensaje.documentMessage;
+                console.log('ESPERANDO_PAGO - esComprobante:', esComprobante);
+                if (!esComprobante) {
+                    await bot.sendMessage(remitente, { 
+                        text: '📎 Por favor envía una *foto* o *PDF* del comprobante' 
+                    });
+                    return;
+                }
+                
+                try {
+                    console.log('Descargando media del mensaje...');
+                    const { buffer, mimetype, nombreArchivo } = await descargarMedia(mensaje);
+                    console.log('Media descargada:', { mimetype, nombreArchivo, bufferLength: buffer.length });
+                    const reservaActualizada = await guardarComprobante(
+                        datos.reservaId,
+                        buffer,
+                        mimetype,
+                        nombreArchivo
+                    );
+                    console.log('Reserva actualizada con comprobante:', reservaActualizada);
+                    await bot.sendMessage(remitente, { 
+                        text: '✅ Comprobante recibido! Estamos verificando tu pago.' 
+                    });
+                    await enviarReservaAlGrupo(bot, reservaActualizada);
+                    await establecerEstado(remitente, ESTADOS_RESERVA.ESPERANDO_CONFIRMACION, datos);
+                } catch (error) {
+                    console.error('Error procesando comprobante:', error);
+                    await bot.sendMessage(remitente, {
+                        text: '⚠️ Error procesando tu comprobante. Intenta nuevamente.'
+                    });
+                }
+                break;
+            }
 
             case ESTADOS_RESERVA.ESPERANDO_CONFIRMACION: {
                 await bot.sendMessage(remitente, { 
@@ -210,8 +204,6 @@ case ESTADOS_RESERVA.ESPERANDO_PAGO: {
                 });
                 break;
             }
-
-            // Estado TELEFONO eliminado por redundancia
         }
     } catch (error) {
         console.error('Error en handleReservaState:', error);

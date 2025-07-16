@@ -117,20 +117,29 @@ async function startBot() {
         if (!isFromMe && msg.message) {
           const remitente = msg.key.remoteJid;
           let texto = '';
+          let messageType = '';
           
           // Extraer contenido según tipo de mensaje
           if (msg.message.conversation) {
             texto = msg.message.conversation.trim();
+            messageType = 'conversation';
           } 
           else if (msg.message.extendedTextMessage?.text) {
             texto = msg.message.extendedTextMessage.text.trim();
+            messageType = 'extendedTextMessage';
+          }
+          else if (msg.message.imageMessage) {
+            texto = msg.message.imageMessage.caption || '';
+            messageType = 'imageMessage';
+          }
+          else if (msg.message.documentMessage) {
+            texto = msg.message.documentMessage.caption || '';
+            messageType = 'documentMessage';
           }
           // Agregar aquí otros tipos de mensaje si son necesarios
           
-          if (texto) {
-            console.log(`📩 Mensaje recibido de ${remitente}: ${texto}`);
-            await procesarMensaje(bot, remitente, texto, msg.message);
-          }
+          console.log(`📩 Mensaje recibido de ${remitente}: ${texto || messageType}`);
+          await procesarMensaje(bot, remitente, texto, msg);
         }
       } catch (processingError) {
         console.error('❌ Error procesando mensaje:', processingError);

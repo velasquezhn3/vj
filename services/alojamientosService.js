@@ -160,7 +160,7 @@ const loadReservations = async () => {
   try {
     console.log('Intentando cargar reservas desde la base de datos...');
     const sql = `
-      SELECT r.*, u.name as user_name, u.phone_number
+      SELECT r.*, u.name as user_name, u.phone_number, r.comprobante_nombre_archivo
       FROM Reservations r
       LEFT JOIN Users u ON r.user_id = u.user_id
       ORDER BY r.start_date DESC
@@ -234,3 +234,4 @@ module.exports = {
   updateReservationStatus,
   getReservationById
 };
+

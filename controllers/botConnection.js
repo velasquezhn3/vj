@@ -88,10 +88,18 @@ function setupEventHandlers(bot, saveCreds, procesarMensajeCallback) {
         try {
             const msg = messages[0];
             if (shouldProcessMessage(msg)) {
-                const { sender, text } = extractMessageContent(msg);
-                if (text) {
-                    console.log(`📩 Mensaje de ${sender}: ${text}`);
-                    await procesarMensajeCallback(bot, sender, text, msg.message);
+                const { sender, text, messageType } = extractMessageContent(msg);
+                if (text || messageType === 'imageMessage' || messageType === 'documentMessage') {
+                    console.log(`📩 Mensaje de ${sender}: ${text || messageType}`);
+                    console.log('msg keys:', Object.keys(msg));
+                    console.log('msg.message keys:', Object.keys(msg.message));
+                    console.log('msg.key:', msg.key);
+                    console.log('msg.message:', msg.message);
+                    console.log('msg.message.imageMessage:', msg.message.imageMessage);
+                    console.log('msg.message.documentMessage:', msg.message.documentMessage);
+                    console.log('msg.message.conversation:', msg.message.conversation);
+                    console.log('msg.message.extendedTextMessage:', msg.message.extendedTextMessage);
+                    await procesarMensajeCallback(bot, sender, text, msg);
                 }
             }
         } catch (msgError) {
@@ -179,12 +187,14 @@ async function scheduleReconnection(callback) {
 }
 
 function shouldProcessMessage(msg) {
-    return (
+    const result = (
         !msg.key.fromMe && 
         msg.message && 
         !isProtocolMessage(msg) &&
         !isEphemeralMessage(msg)
     );
+    console.log(`shouldProcessMessage: ${result} for message keys: ${Object.keys(msg.message)}`);
+    return result;
 }
 
 function isProtocolMessage(msg) {

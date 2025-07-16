@@ -1,6 +1,10 @@
-const GRUPO_JID = process.env.GRUPO_JID || '120363420483868468@g.us';
+// utils.js (versión corregida)
+const fs = require('fs');
+const path = require('path');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const streamToBuffer = require('stream-to-buffer');
+
+const GRUPO_JID = process.env.GRUPO_JID || '120363420483868468@g.us';
 
 // Función auxiliar para convertir stream a buffer
 const streamToBufferPromise = (stream) => new Promise((resolve, reject) => {
@@ -9,6 +13,23 @@ const streamToBufferPromise = (stream) => new Promise((resolve, reject) => {
     resolve(buffer);
   });
 });
+
+// Función para guardar buffer en archivo (mejorada)
+const guardarArchivo = async (buffer, nombreArchivo) => {
+  const dir = path.join(__dirname, '../admin-frontend/public/comprobantes');
+  
+  // Crear directorio si no existe
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`[FS] Directorio creado: ${dir}`);
+  }
+  
+  const filePath = path.join(dir, nombreArchivo);
+  await fs.promises.writeFile(filePath, buffer);
+  console.log(`[FS] Archivo guardado: ${filePath}`);
+  
+  return `comprobantes/${nombreArchivo}`; // Ruta relativa para guardar en DB
+};
 
 // Función segura para enviar mensajes de texto
 async function safeSend(bot, recipient, text) {
@@ -50,7 +71,7 @@ const enviarAlGrupo = async (bot, texto) => {
   await safeSend(bot, GRUPO_JID, texto);
 };
 
-// Descargar contenido de mensaje como buffer
+// Descargar contenido de mensaje como buffer (mejorada)
 const descargarContenido = async (messageContent, tipo) => {
   try {
     const stream = await downloadContentFromMessage(messageContent, tipo);
@@ -62,56 +83,106 @@ const descargarContenido = async (messageContent, tipo) => {
   }
 };
 
-// Reenviar comprobante al grupo
+// NUEVA FUNCIÓN PARA DESCARGAR MEDIA
+async function descargarMedia(mensaje) {
+  let tipoMedia, mediaMessage, extension;
+
+  if (mensaje.imageMessage) {
+    tipoMedia = 'image';
+    mediaMessage = mensaje.imageMessage;
+    extension = 'jpg';
+  } else if (mensaje.documentMessage) {
+    tipoMedia = 'document';
+    mediaMessage = mensaje.documentMessage;
+    extension = mediaMessage.fileName.split('.').pop() || 'bin';
+  } else {
+    throw new Error('Tipo multimedia no soportado');
+  }
+
+  const stream = await downloadContentFromMessage(mediaMessage, tipoMedia);
+
+  const buffer = await new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on('data', chunk => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', reject);
+  });
+
+  return {
+    buffer,
+    mimetype: mediaMessage.mimetype || (tipoMedia === 'image' ? 'image/jpeg' : 'application/octet-stream'),
+    nombreArchivo: `comprobante-${Date.now()}.${extension}`
+  };
+}
+
+// FUNCIÓN CORREGIDA PARA REENVIAR COMPROBANTES
 const reenviarComprobanteAlGrupo = async (bot, mensaje, datos) => {
-  const nombre = datos?.nombre || 'Cliente desconocido';
-  const caption = `✅ Comprobante de ${nombre}`;
-  
   try {
-    const imageMsg = mensaje.imageMessage || mensaje.message?.imageMessage;
-    const documentMsg = mensaje.documentMessage || mensaje.message?.documentMessage;
+    const nombre = datos?.nombre || 'Cliente desconocido';
+    const caption = `✅ Comprobante de ${nombre}`;
     
-    let buffer = null;
-    let tipoContenido = 'desconocido';
+    // Acceder a la estructura correcta del mensaje
+    const msgContent = mensaje.message || mensaje;
     
-    if (imageMsg) {
-      buffer = await descargarContenido({ imageMessage: imageMsg }, 'image');
-      tipoContenido = 'imagen';
-    } else if (documentMsg) {
-      buffer = await descargarContenido({ documentMessage: documentMsg }, 'document');
-      tipoContenido = 'documento';
+    let mediaData;
+    if (msgContent.imageMessage) {
+      console.log('[DEBUG] Descargando imagen...');
+      mediaData = await descargarMedia(msgContent);
+    } 
+    else if (msgContent.documentMessage) {
+      console.log('[DEBUG] Descargando documento...');
+      mediaData = await descargarMedia(msgContent);
+    } 
+    else {
+      throw new Error('Tipo multimedia no soportado');
     }
-    
-    if (!buffer || buffer.length === 0) {
-      throw new Error(`Buffer de ${tipoContenido} vacío`);
+
+    // Validar buffer
+    if (!mediaData.buffer || mediaData.buffer.length === 0) {
+      throw new Error('Buffer de media vacío');
     }
-    
-    if (tipoContenido === 'imagen') {
-      await bot.sendMessage(GRUPO_JID, { image: buffer, caption });
-    } else if (tipoContenido === 'documento') {
-      await bot.sendMessage(GRUPO_JID, { 
-        document: buffer, 
-        caption,
-        mimetype: documentMsg.mimetype || 'application/octet-stream'
-      });
-    } else {
-      throw new Error('Tipo de comprobante no soportado');
+
+    // Guardar archivo
+    console.log('[DEBUG] Guardando archivo...');
+    const rutaRelativa = await guardarArchivo(mediaData.buffer, mediaData.nombreArchivo);
+    console.log('[DEBUG] Ruta guardada:', rutaRelativa);
+
+    // Preparar datos para enviar
+    const mediaType = msgContent.imageMessage ? 'image' : 'document';
+    const sendOptions = {
+      [mediaType]: mediaData.buffer,
+      caption: caption,
+      mimetype: mediaData.mimetype
+    };
+
+    // Agregar nombre de archivo solo para documentos
+    if (mediaType === 'document') {
+      sendOptions.fileName = mediaData.nombreArchivo;
     }
-    
-    console.log(`[Grupo] Comprobante de ${nombre} reenviado (${tipoContenido})`);
+
+    // Enviar al grupo
+    console.log(`[DEBUG] Enviando ${mediaType} al grupo...`);
+    await bot.sendMessage(GRUPO_JID, sendOptions);
+    console.log(`[Grupo] Comprobante enviado: ${mediaData.nombreArchivo}`);
+
+    return rutaRelativa;
   } catch (error) {
-    console.error(`[Comprobante] Error para ${nombre}:`, error.message);
-    await safeSend(bot, GRUPO_JID, `⚠️ Error con comprobante de ${nombre}: ${error.message}`);
+    console.error(`[Comprobante] Error: ${error.message}`);
+    await safeSend(bot, GRUPO_JID, `⚠️ Error con comprobante: ${error.message}`);
+    return null;
   }
 };
 
 module.exports = {
   GRUPO_JID,
-  safeSend, // Exportada para uso en otros módulos
+  safeSend,
   isValidDate,
   confirmarReserva,
   isValidUrl,
   validarDisponibilidad,
   enviarAlGrupo,
-  reenviarComprobanteAlGrupo
+  descargarContenido,
+  reenviarComprobanteAlGrupo,
+  guardarArchivo,
+  descargarMedia // Exportada para uso externo
 };

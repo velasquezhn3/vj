@@ -156,11 +156,44 @@ async function handleReservarCommand(bot, remitente) {
     });
 }
 
-async function handleCancelarCommand(bot, remitente) {
-    // Implementación futura
-    await bot.sendMessage(remitente, { 
-        text: '⏳ Comando /cancelar en desarrollo' 
-    });
+const { eliminarComprobante, actualizarEstado } = require('../../services/comprobanteService');
+
+async function handleCancelarCommand(bot, remitente, telefono) {
+    if (!telefono) {
+        await bot.sendMessage(remitente, { text: '❌ Por favor proporciona un número de teléfono. Uso: /cancelar [telefono]' });
+        return;
+    }
+
+    // Buscar reserva pendiente o con comprobante por teléfono
+    const reservation = await alojamientosService.getReservationByPhoneAndStatus(telefono, 'comprobante_recibido');
+    if (!reservation) {
+        await bot.sendMessage(remitente, { text: `❌ No se encontró reserva con comprobante para el teléfono ${telefono}` });
+        return;
+    }
+
+    try {
+        // Eliminar comprobante y actualizar estado a cancelada
+        await eliminarComprobante(reservation.reservation_id);
+
+        // Notificar al usuario para enviar comprobante válido
+        const userJid = `${telefono}@s.whatsapp.net`;
+        await bot.sendMessage(userJid, { 
+            text: '❌ Tu comprobante fue rechazado. Por favor envía un comprobante válido para continuar con la reserva.' 
+        });
+
+        // Notificar al grupo
+        await bot.sendMessage(GRUPO_JID, { 
+            text: `❌ Comprobante rechazado para la reserva #${reservation.reservation_id} del teléfono ${telefono}. Se solicitó comprobante válido.` 
+        });
+
+        // Confirmar al remitente que la acción fue realizada
+        await bot.sendMessage(remitente, { 
+            text: `✅ Comprobante eliminado y estado actualizado a cancelada para la reserva #${reservation.reservation_id}.` 
+        });
+    } catch (error) {
+        logger.error(`Error en handleCancelarCommand: ${error.message}`, { error });
+        await bot.sendMessage(remitente, { text: '⚠️ Error al procesar la cancelación. Intenta nuevamente.' });
+    }
 }
 
 async function handleConfirmadoCommand(bot, remitente, telefono, mensajeObj) {
@@ -222,14 +255,14 @@ async function handleReservadoCommand(bot, remitente, telefono) {
         return;
     }
 
-    // Actualizar estado a confirmada
-    const success = await alojamientosService.updateReservationStatus(reservation.reservation_id, 'confirmada');
+    // Actualizar estado a completada
+    const success = await alojamientosService.updateReservationStatus(reservation.reservation_id, 'completada');
     if (!success) {
         await bot.sendMessage(remitente, { text: '⚠️ Error al actualizar el estado de la reserva. Intenta nuevamente.' });
         return;
     }
 
-    await bot.sendMessage(remitente, { text: `✅ Reserva #${reservation.reservation_id} confirmada exitosamente.` });
+    await bot.sendMessage(remitente, { text: `✅ Reserva #${reservation.reservation_id} completada exitosamente.` });
 }
 
 function extractMessageText(mensajeObj) {
@@ -278,15 +311,18 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
             message: mensajeTexto
         });
 
+        // Log current user state for debugging
+        logger.info(`Usuario ${remitente} está en estado: ${estado}`);
+
         // Log messageObj for debugging
-        logger.debug('Mensaje recibido:', mensajeObj);
+        logger.debug('Mensaje recibido completo:', mensajeObj);
 
         // Check if message contains image or document to forward as deposit receipt
         const hasImage = mensajeObj?.message?.imageMessage || mensajeObj?.imageMessage;
         const hasDocument = mensajeObj?.message?.documentMessage || mensajeObj?.documentMessage;
 
-        if (estado === ESTADOS_RESERVA.ESPERANDO_CONFIRMACION && (hasImage || hasDocument)) {
-            logger.info('Estado ESPERANDO_CONFIRMACION y mensaje con imagen o documento detectado, reenviando comprobante al grupo.');
+        if ((estado === ESTADOS_RESERVA.ESPERANDO_CONFIRMACION || estado === ESTADOS_RESERVA.ESPERANDO_PAGO) && (hasImage || hasDocument)) {
+            logger.info(`Estado ${estado} y mensaje con imagen o documento detectado, reenviando comprobante al grupo.`);
             // Forward deposit receipt to group
             await reenviarComprobanteAlGrupo(bot, mensajeObj, datos);
             return;
