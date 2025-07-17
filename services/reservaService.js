@@ -71,7 +71,23 @@ async function createReservationWithUser(phoneNumber, reservaData, cabinId) {
     }
 }
 
+async function updateUserNameByPhone(phoneNumber, name) {
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (!normalizedPhone) {
+        return { success: false, error: 'Número de teléfono inválido' };
+    }
+    try {
+        const updateSql = `UPDATE Users SET name = ? WHERE phone_number = ?`;
+        await runExecute(updateSql, [name, normalizedPhone]);
+        return { success: true };
+    } catch (error) {
+        logger.error('Error updating user name:', error);
+        return { success: false, error: error.message || 'Error desconocido' };
+    }
+}
+
 module.exports = {
     createReservationWithUser,
-    normalizePhoneNumber
+    normalizePhoneNumber,
+    updateUserNameByPhone
 };

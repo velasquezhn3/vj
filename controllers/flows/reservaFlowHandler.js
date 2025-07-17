@@ -3,6 +3,9 @@ const { calcularPrecioTotal } = require('../../services/reservaPriceService');
 const { enviarAlGrupo, reenviarComprobanteAlGrupo } = require('../../utils/utils');
 const Reserva = require('../../models/Reserva');
 const { ESTADOS_RESERVA } = require('../reservaConstants');
+const { createReservationWithUser } = require('../../services/reservaService');
+const fs = require('fs');
+const path = require('path');
 
 // Funciones auxiliares para mejorar la legibilidad
 const parsearFechas = (texto) => {
@@ -25,6 +28,18 @@ const asignarAlojamiento = (personas) => {
     if (personas <= 6) return 'Cabaña Caracol';
     if (personas <= 9) return 'Cabaña Tiburón';
     return null;
+};
+
+const cargarCabanas = () => {
+    const cabanasPath = path.resolve(__dirname, '../../data/cabañas.json');
+    const cabanasJson = fs.readFileSync(cabanasPath, 'utf-8');
+    return JSON.parse(cabanasJson);
+};
+
+const obtenerCabinIdPorNombre = (nombreCabin) => {
+    const cabanas = cargarCabanas();
+    const cabin = cabanas.find(c => c.nombre.toLowerCase().startsWith(nombreCabin.toLowerCase()));
+    return cabin ? cabin.id : null;
 };
 
 async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje) {
@@ -74,10 +89,18 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
 
             case ESTADOS_RESERVA.NOMBRE: {
                 const telefono = remitente.split('@')[0];
+                const nombre = mensajeTexto.trim();
+                // Update user name in DB
+                try {
+                    const { updateUserNameByPhone } = require('../../services/reservaService');
+                    await updateUserNameByPhone(telefono, nombre);
+                } catch (error) {
+                    console.error('Error updating user name:', error);
+                }
                 await bot.sendMessage(remitente, { text: '👥 *¿Cuántas personas serán?*' });
                 await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { 
                     ...datos, 
-                    nombre: mensajeTexto.trim(),
+                    nombre,
                     telefono 
                 });
                 break;
@@ -141,6 +164,37 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                     return;
                 }
                 
+                // Crear reserva en base de datos
+                const cabinId = obtenerCabinIdPorNombre(datos.alojamiento);
+                if (!cabinId) {
+                    await bot.sendMessage(remitente, { 
+                        text: '❌ Error: No se pudo encontrar la cabaña seleccionada en la base de datos.' 
+                    });
+                    return;
+                }
+                const reservaData = {
+                    start_date: datos.fechaEntrada.split('/').reverse().join('-'),
+                    end_date: datos.fechaSalida.split('/').reverse().join('-'),
+                    status: 'pendiente',
+                    total_price: datos.precioTotal
+                };
+                try {
+                    const result = await createReservationWithUser(datos.telefono, reservaData, cabinId);
+                    if (!result.success) {
+                        await bot.sendMessage(remitente, { 
+                            text: `❌ Error guardando la reserva: ${result.error}` 
+                        });
+                        return;
+                    }
+                    datos.reservation_id = result.reservationId;
+                } catch (error) {
+                    console.error('Error creando reserva:', error);
+                    await bot.sendMessage(remitente, { 
+                        text: '❌ Error guardando la reserva. Intenta nuevamente.' 
+                    });
+                    return;
+                }
+                
                 const resumen = `
 📋 *NUEVA SOLICITUD DE RESERVA*
 --------------------------------
@@ -160,7 +214,7 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                 });
                 
                 await establecerEstado(remitente, ESTADOS_RESERVA.ESPERANDO_PAGO, {
-                    reservaId: datos.reservation_id,
+                    reservation_id: datos.reservation_id,
                     nombre: datos.nombre,
                     telefono: datos.telefono
                 });

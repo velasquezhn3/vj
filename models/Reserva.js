@@ -30,8 +30,16 @@ async function updateComprobante(id, buffer, contentType, nombreArchivo) {
 
 async function updateEstado(id, nuevoEstado) {
   const sql = `UPDATE ${TABLE_NAME} SET status = ? WHERE reservation_id = ?`;
-  await runExecute(sql, [nuevoEstado, id]);
-  return findById(id);
+  try {
+    console.log(`[DEBUG] updateEstado: updating reservation_id=${id} to status=${nuevoEstado}`);
+    await runExecute(sql, [nuevoEstado, id]);
+    const updated = await findById(id);
+    console.log(`[DEBUG] updateEstado: updated reservation status=${updated.status}`);
+    return updated;
+  } catch (error) {
+    console.error(`[ERROR] updateEstado failed: ${error.message}`, error);
+    throw error;
+  }
 }
 
 async function eliminarComprobante(id) {

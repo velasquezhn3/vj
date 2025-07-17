@@ -249,7 +249,7 @@ async function handleReservadoCommand(bot, remitente, param) {
             return;
         }
 
-        console.log('[DEBUG] Reserva estado:', reserva.estado);
+        console.log('[DEBUG] Reserva estado:', reserva.status);
         if (!reserva.status || reserva.status.trim().toLowerCase() !== 'pendiente') {
             await bot.sendMessage(remitente, { text: `⚠️ La reserva #${param} no está en estado pendiente.` });
             return;
