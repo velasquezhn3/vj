@@ -177,7 +177,26 @@ case ESTADOS_RESERVA.ESPERANDO_PAGO: {
         return;
     }
     
-    const rutaArchivo = await reenviarComprobanteAlGrupo(bot, mensaje, datos);
+    // Recuperar datos de reserva para enviar junto al comprobante
+    let reservaInfo = null;
+    try {
+        const reserva = await Reserva.findByPk(datos.reservation_id);
+        if (reserva) {
+            reservaInfo = `
+📋 *Información de la reserva:*
+• Nombre: ${reserva.nombre}
+• Teléfono: ${reserva.telefono}
+• Personas: ${reserva.personas}
+• Alojamiento: ${reserva.alojamiento}
+• Fechas: ${reserva.fechaEntrada} - ${reserva.fechaSalida}
+• Precio total: $${reserva.precioTotal}
+            `;
+        }
+    } catch (error) {
+        console.error('[ERROR] Error recuperando datos de reserva:', error);
+    }
+
+    const rutaArchivo = await reenviarComprobanteAlGrupo(bot, mensaje, datos, reservaInfo);
     console.log('[DEBUG] reservation_id:', JSON.stringify(datos.reservation_id));
     console.log('[DEBUG] rutaArchivo:', rutaArchivo ? rutaArchivo.toString() : rutaArchivo);
     if (rutaArchivo) {

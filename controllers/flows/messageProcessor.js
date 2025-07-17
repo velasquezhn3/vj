@@ -9,8 +9,33 @@ const { handleReservaState } = require('./reservaFlowHandler');
 const { ESTADOS_RESERVA } = require('../reservaConstants');
 const { enviarMenuPrincipal } = require('../../services/messagingService');
 const logger = require('../../config/logger');
-const { reenviarComprobanteAlGrupo, GRUPO_JID } = require('../../utils/utils');
+const { reenviarComprobanteAlGrupo, GRUPO_JID, enviarAlGrupo, safeSend } = require('../../utils/utils');
 const alojamientosService = require('../../services/alojamientosService');
+const Reserva = require('../../models/Reserva');
+const { runQuery } = require('../../db');
+
+// Helper function to send detailed reservation info to group
+async function enviarReservaAlGrupo(bot, reserva) {
+    try {
+        const resumen = `
+📝 *NUEVA RESERVA - COMPROBANTE RECIBIDO*
+--------------------------------------
+🆔 ID: ${reserva.reservation_id || reserva._id}
+👤 Nombre: ${reserva.nombre}
+📞 Teléfono: ${reserva.telefono}
+📅 Fechas: ${reserva.fechaEntrada || reserva.start_date} → ${reserva.fechaSalida || reserva.end_date}
+👥 Personas: ${reserva.personas}
+🏠 Alojamiento: ${reserva.alojamiento || (reserva.alojamiento && reserva.alojamiento.nombre) || 'N/A'}
+💵 Total: $${reserva.precioTotal || reserva.total_price}
+--------------------------------------
+✅ Usa /reservado ${reserva.reservation_id || reserva._id} para confirmar
+❌ Usa /cancelar ${reserva.reservation_id || reserva._id} para rechazar
+        `;
+        await safeSend(bot, GRUPO_JID, resumen);
+    } catch (error) {
+        console.error('[ERROR] enviarReservaAlGrupo:', error);
+    }
+}
 
 // Comandos válidos para grupos
 const GROUP_COMMANDS = {
@@ -51,30 +76,17 @@ async function handleGroupCommand(bot, remitente, mensajeTexto, mensajeObj) {
 const fs = require('fs');
 const path = require('path');
 
+const { createReservationWithUser, normalizePhoneNumber } = require('../../services/reservaService');
+
 async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
     try {
         logger.info(`Comando /confirmar recibido con parámetro: ${param || 'ninguno'}`);
 
-        // Cargar cabañas
-        const cabinsDataPath = path.join(__dirname, '../../data/cabañas.json');
-        const cabinsJson = fs.readFileSync(cabinsDataPath, 'utf-8');
-        const cabins = JSON.parse(cabinsJson);
-
-        // Asignar cabaña según lógica de personas (ejemplo: 1-3 pers: cab1, 4-6 pers: cab2, 7-9 pers: cab3)
-        // Aquí asumimos que el número de personas se pasa como segundo parámetro (param2)
-        // Si no se tiene, asignamos la primera cabaña por defecto
-        let cabinId = cabins[0].id;
-
-        // Para obtener número de personas, se podría pasar como parte del parámetro o buscar en DB (no implementado)
-        // Por simplicidad, asignamos la primera cabaña
-
         // Determinar userId: si el comando viene de un grupo, extraer de param limpiando sufijo @s.whatsapp.net, si no usar param tal cual
         let userId;
         if (remitente.endsWith('@g.us')) {
-            // En grupo, param puede venir con sufijo @s.whatsapp.net, quitarlo
             userId = param ? param.replace(/@s\.whatsapp\.net$/, '') : undefined;
         } else {
-            // En privado, usar param tal cual
             userId = param;
         }
 
@@ -82,79 +94,60 @@ async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
             throw new Error('No se pudo determinar el número de teléfono del usuario');
         }
 
-        // Crear reserva con datos mínimos
+        // Cargar cabañas para obtener cabinId
+        const cabinsDataPath = path.join(__dirname, '../../data/cabañas.json');
+        const cabinsJson = fs.readFileSync(cabinsDataPath, 'utf-8');
+        const cabins = JSON.parse(cabinsJson);
+        const cabinId = cabins[0].id;
+
+        // Crear datos de reserva mínimos
         const reservaData = {
-            start_date: new Date().toISOString().split('T')[0], // fecha actual como ejemplo
-            end_date: new Date().toISOString().split('T')[0],   // fecha actual como ejemplo
+            start_date: new Date().toISOString().split('T')[0],
+            end_date: new Date().toISOString().split('T')[0],
             status: 'pendiente',
-            total_price: cabins[0].price || 0
+            total_price: 0
         };
 
-        const success = await alojamientosService.addReserva(cabinId, userId, reservaData);
-        logger.info(`Resultado de addReserva: ${success}`);
+        // Crear reserva con usuario y obtener ID, pasando cabinId
+        const result = await createReservationWithUser(userId, reservaData, cabinId);
 
-        if (success) {
-            // Construir JID del usuario a partir del número limpio
-            const userJid = `${userId}@s.whatsapp.net`;
+        if (!result.success) {
+            throw new Error(result.error || 'Error al guardar la reserva');
+        }
 
-            // Enviar mensaje de confirmación al grupo
-            try {
-                await bot.sendMessage(GRUPO_JID, {
-                    text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${userId}`
-                });
-                logger.info(`Mensaje de confirmación enviado al grupo ${GRUPO_JID}`);
-            } catch (err) {
-                logger.error(`Error enviando mensaje de confirmación al grupo ${GRUPO_JID}: ${err.message}`, { err });
-            }
+        const reservationId = result.reservationId;
+        const userJid = `${normalizePhoneNumber(userId)}@s.whatsapp.net`;
+        const comandoReservado = `/reservado ${reservationId}`;
 
-            // Enviar mensaje de confirmación al usuario
-            try {
-                await bot.sendMessage(userJid, { 
-                    text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${userId}` 
-                });
-                logger.info(`Mensaje de confirmación enviado a ${userJid}`);
-            } catch (err) {
-                logger.error(`Error enviando mensaje de confirmación a ${userJid}: ${err.message}`, { err });
-            }
+        // Enviar confirmación al grupo
+        await bot.sendMessage(GRUPO_JID, {
+            text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${normalizePhoneNumber(userId)}\nID de reserva: ${reservationId}\n\nUsa este comando para confirmar la reserva:\n${comandoReservado}`
+        });
 
-            // Enviar instrucciones de depósito al usuario (independiente)
-            const depositInstructions = `Su reserva fue aprobada. Tiene 24 horas para enviar el comprobante de transferencia a los siguientes bancos:
+        // Enviar confirmación al usuario
+        await bot.sendMessage(userJid, {
+            text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${normalizePhoneNumber(userId)}\nID de reserva: ${reservationId}\n\nPara confirmar la reserva, el administrador debe usar este comando:\n${comandoReservado}`
+        });
+
+        // Enviar instrucciones de depósito al usuario
+        const depositInstructions = `Su reserva fue aprobada. Tiene 24 horas para enviar el comprobante de transferencia a los siguientes bancos:
 - Ficohsa
 - BAC
 - Occidente
 - Atlántida
 Puedes enviar la foto de la reserva en este chat o más adelante, seleccionando la opción 8: Ayuda post-reserva.`;
 
-            try {
-                logger.info(`Intentando enviar instrucciones de depósito a ${userJid}`);
-                const sent = await bot.sendMessage(userJid, { text: depositInstructions });
-                logger.info(`Instrucciones de depósito enviadas a ${userJid}`, { sent });
-            } catch (err) {
-                logger.error(`Error enviando instrucciones de depósito a ${userJid}: ${err.message}`, { err });
-            }
+        await bot.sendMessage(userJid, { text: depositInstructions });
 
-            // Enviar mensaje de prueba al remitente original para verificar conectividad
-            try {
-                await bot.sendMessage(remitente, { text: 'Mensaje de prueba para verificar conectividad.' });
-                logger.info(`Mensaje de prueba enviado a remitente ${remitente}`);
-            } catch (err) {
-                logger.error(`Error enviando mensaje de prueba a remitente ${remitente}: ${err.message}`, { err });
-            }
-        } else {
-            throw new Error('Error al guardar la reserva en la base de datos');
-        }
+        // Enviar mensaje de prueba al remitente original para verificar conectividad
+        await bot.sendMessage(remitente, { text: 'Mensaje de prueba para verificar conectividad.' });
+
     } catch (error) {
         logger.error(`Error en handleConfirmarCommand: ${error.message}`, { error });
         await bot.sendMessage(remitente, { text: '⚠️ Error procesando la reserva. Por favor intenta nuevamente.' });
     }
 }
 
-async function handleReservarCommand(bot, remitente) {
-    // Implementación futura
-    await bot.sendMessage(remitente, { 
-        text: '⏳ Comando /reservar en desarrollo' 
-    });
-}
 
 const { eliminarComprobante, actualizarEstado } = require('../../services/comprobanteService');
 
@@ -242,27 +235,40 @@ Una vez realizado el depósito, envía el comprobante aquí.`;
     }
 }
 
-async function handleReservadoCommand(bot, remitente, telefono) {
-    if (!telefono) {
-        await bot.sendMessage(remitente, { text: '❌ Por favor proporciona un número de teléfono. Uso: /reservado [telefono]' });
+async function handleReservadoCommand(bot, remitente, param) {
+    if (!param) {
+        await bot.sendMessage(remitente, { text: '❌ Por favor proporciona el ID de la reserva. Uso: /reservado [ID]' });
         return;
     }
 
-    // Buscar reserva pendiente por teléfono
-    const reservation = await alojamientosService.getReservationByPhoneAndStatus(telefono, 'pendiente');
-    if (!reservation) {
-        await bot.sendMessage(remitente, { text: `❌ No se encontró reserva pendiente para el teléfono ${telefono}` });
-        return;
-    }
+    try {
+        const reserva = await Reserva.findById(param);
+        console.log('[DEBUG] Reserva fetched:', reserva);
+        if (!reserva) {
+            await bot.sendMessage(remitente, { text: `❌ No se encontró reserva con ID ${param}` });
+            return;
+        }
 
-    // Actualizar estado a completada
-    const success = await alojamientosService.updateReservationStatus(reservation.reservation_id, 'completada');
-    if (!success) {
-        await bot.sendMessage(remitente, { text: '⚠️ Error al actualizar el estado de la reserva. Intenta nuevamente.' });
-        return;
-    }
+        console.log('[DEBUG] Reserva estado:', reserva.estado);
+        if (!reserva.status || reserva.status.trim().toLowerCase() !== 'pendiente') {
+            await bot.sendMessage(remitente, { text: `⚠️ La reserva #${param} no está en estado pendiente.` });
+            return;
+        }
 
-    await bot.sendMessage(remitente, { text: `✅ Reserva #${reservation.reservation_id} completada exitosamente.` });
+        const updatedReserva = await Reserva.updateEstado(param, 'confirmado');
+        if (!updatedReserva) {
+            await bot.sendMessage(remitente, { text: '⚠️ Error al actualizar el estado de la reserva. Intenta nuevamente.' });
+            return;
+        }
+
+        await bot.sendMessage(remitente, { text: `✅ Reserva #${param} confirmada exitosamente.` });
+
+        // Enviar resumen detallado al grupo
+        await enviarReservaAlGrupo(bot, updatedReserva);
+    } catch (error) {
+        console.error('[ERROR] handleReservadoCommand:', error);
+        await bot.sendMessage(remitente, { text: '⚠️ Error procesando el comando /reservado. Intenta nuevamente.' });
+    }
 }
 
 function extractMessageText(mensajeObj) {

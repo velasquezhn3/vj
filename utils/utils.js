@@ -115,8 +115,7 @@ async function descargarMedia(mensaje) {
   };
 }
 
-// FUNCIÓN CORREGIDA PARA REENVIAR COMPROBANTES
-const reenviarComprobanteAlGrupo = async (bot, mensaje, datos) => {
+const reenviarComprobanteAlGrupo = async (bot, mensaje, datos, reservaInfo = null) => {
   try {
     const nombre = datos?.nombre || 'Cliente desconocido';
     const caption = `✅ Comprobante de ${nombre}`;
@@ -164,6 +163,12 @@ const reenviarComprobanteAlGrupo = async (bot, mensaje, datos) => {
     console.log(`[DEBUG] Enviando ${mediaType} al grupo...`);
     await bot.sendMessage(GRUPO_JID, sendOptions);
     console.log(`[Grupo] Comprobante enviado: ${mediaData.nombreArchivo}`);
+
+    // Enviar info de reserva si se proporciona
+    if (reservaInfo) {
+      console.log('[DEBUG] Enviando información de reserva al grupo...');
+      await safeSend(bot, GRUPO_JID, reservaInfo);
+    }
 
     return rutaRelativa;
   } catch (error) {
