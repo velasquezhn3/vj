@@ -1,3 +1,4 @@
+
 const { establecerEstado } = require('../../services/stateService');
 const { calcularPrecioTotal } = require('../../services/reservaPriceService');
 const { enviarAlGrupo, reenviarComprobanteAlGrupo } = require('../../utils/utils');
@@ -101,12 +102,19 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
             case ESTADOS_RESERVA.NOMBRE: {
                 const telefono = remitente.split('@')[0];
                 const nombre = mensajeTexto.trim();
-                // Update user name in DB
+                // Upsert user in DB with logging and error handling
                 try {
-                    const { updateUserNameByPhone } = require('../../services/reservaService');
-                    await updateUserNameByPhone(telefono, nombre);
+                    const { upsertUser } = require('../../services/reservaService');
+                    const result = await upsertUser(telefono, nombre);
+                    if (!result.success) {
+                        console.error('Failed to upsert user:', result.error);
+                        await bot.sendMessage(remitente, { text: '⚠️ No se pudo guardar tu nombre. Por favor intenta nuevamente.' });
+                        return;
+                    }
                 } catch (error) {
-                    console.error('Error updating user name:', error);
+                    console.error('Error upserting user:', error);
+                    await bot.sendMessage(remitente, { text: '⚠️ Ocurrió un error guardando tu nombre. Por favor intenta nuevamente.' });
+                    return;
                 }
                 await bot.sendMessage(remitente, { text: '👥 *¿Cuántas personas serán?*' });
                 await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { 

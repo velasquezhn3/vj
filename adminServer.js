@@ -18,6 +18,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Serve static files for simple frontend UI
 const path = require('path');
+app.use('/comprobantes', express.static(path.join(__dirname, 'public/comprobantes')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Users routes
@@ -47,30 +48,11 @@ app.put('/admin/cabins/:id', upload.single('photo'), adminCabinsController.updat
 
 app.delete('/admin/cabins/:id', adminCabinsController.deleteCabana);
 
+const adminReservationsRoutes = require('./routes/adminReservations');
+
 // Reservations routes
-app.get('/admin/reservations', async (req, res) => {
-  const reservations = await alojamientosService.loadReservations();
-  res.json(reservations);
-});
-
-app.post('/admin/reservations', async (req, res) => {
-  const { cabin_id, user_id, start_date, end_date, status, total_price } = req.body;
-  const success = await alojamientosService.addReserva(cabin_id, user_id, { start_date, end_date, status, total_price });
-  res.json({ success });
-});
-
-app.put('/admin/reservations/:id', async (req, res) => {
-  const reservationId = parseInt(req.params.id);
-  const reservationData = req.body;
-  const success = await alojamientosService.updateReservation(reservationId, reservationData);
-  res.json({ success });
-});
-
-app.delete('/admin/reservations/:id', async (req, res) => {
-  const reservationId = parseInt(req.params.id);
-  const success = await alojamientosService.deleteReservation(reservationId);
-  res.json({ success });
-});
+// Remove old routes and use new routes with file upload support
+app.use(adminReservationsRoutes);
 
 const conversationStatesService = require('./services/conversationStatesService');
 

@@ -43,3 +43,6 @@ yarn.lock
 *.gz
 *.zip
 *.tar
+
+# Ignore admin-frontend folder
+/admin-frontend/

@@ -88,6 +88,35 @@ async function updateUserNameByPhone(phoneNumber, name) {
 }
 
 /**
+ * Insert or update user with phone number and name.
+ * If user exists, update the name.
+ * If user does not exist, insert new user with phone and name.
+ * @param {string} phoneNumber 
+ * @param {string} name 
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+async function upsertUser(phoneNumber, name) {
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (!normalizedPhone) {
+        return { success: false, error: 'Número de teléfono inválido' };
+    }
+    try {
+        // Try to update first
+        const updateSql = `UPDATE Users SET name = ? WHERE phone_number = ?`;
+        const updateResult = await runExecute(updateSql, [name, normalizedPhone]);
+        if (updateResult.changes === 0) {
+            // No rows updated, insert new user
+            const insertSql = `INSERT INTO Users (phone_number, name) VALUES (?, ?)`;
+            await runExecute(insertSql, [normalizedPhone, name]);
+        }
+        return { success: true };
+    } catch (error) {
+        logger.error('Error in upsertUser:', error);
+        return { success: false, error: error.message || 'Error desconocido' };
+    }
+}
+
+/**
  * Get reservation details by reservation ID, including user and cabin info.
  * @param {number} reservationId 
  * @returns {Promise<object|null>} reservation details or null if not found
@@ -123,9 +152,26 @@ async function getReservationDetailsById(reservationId) {
     }
 }
 
+async function updateComprobante(reservationId, comprobanteData, comprobanteContentType, comprobanteNombreArchivo) {
+    try {
+        const sql = `
+            UPDATE Reservations
+            SET comprobante_nombre_archivo = ?
+            WHERE reservation_id = ?
+        `;
+        await runExecute(sql, [comprobanteNombreArchivo, reservationId]);
+        return { success: true };
+    } catch (error) {
+        logger.error('Error updating comprobante:', error);
+        return { success: false, error: error.message || 'Error desconocido' };
+    }
+}
+
 module.exports = {
     createReservationWithUser,
     normalizePhoneNumber,
     updateUserNameByPhone,
-    getReservationDetailsById
+    getReservationDetailsById,
+    updateComprobante,
+    upsertUser
 };
