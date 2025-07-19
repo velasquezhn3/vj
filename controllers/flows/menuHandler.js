@@ -58,11 +58,15 @@ async function handleDetalleCabana(bot, remitente, mensajeTexto, establecerEstad
             break;
             
         case OPCIONES.RESERVAR:
-            await bot.sendMessage(remitente, {
-                text: '⏳ Funcionalidad de reserva en desarrollo. Serás redirigido al menú principal.'
-            });
-            await enviarMenuPrincipal(bot, remitente);
-            establecerEstado('MENU_PRINCIPAL');
+            // Redirect to reservation flow by setting user state to initial reservation state
+            {
+                const { establecerEstado } = require('../../services/stateService');
+                const { ESTADOS_RESERVA } = require('../reservaConstants');
+                await establecerEstado(remitente, ESTADOS_RESERVA.FECHAS);
+                await bot.sendMessage(remitente, {
+                    text: 'Has seleccionado reservar una cabaña. Por favor ingresa las fechas de tu estadía (ej: "20/08/2025 - 25/08/2025"):'
+                });
+            }
             break;
             
         case OPCIONES.MENU_PRINCIPAL:

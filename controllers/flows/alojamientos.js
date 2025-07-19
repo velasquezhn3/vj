@@ -258,22 +258,31 @@ const flowAlojamientos = addKeyword(['1', 'alojamiento', 'cabañas'])
     async (ctx, { flowDynamic, endFlow }) => {
       const cabañas = loadCabañas();
       const seleccion = parseInt(ctx.body.trim());
-      
+
       if (isNaN(seleccion) || seleccion < 1 || seleccion > cabañas.length) {
         await flowDynamic('⚠️ Selección inválida. Por favor ingresa solo el número (1, 2 o 3).');
         return endFlow();
       }
-      
+
+      if (seleccion === 2) {
+        // Redirect to reservation flow by setting user state and prompting for dates
+        const { establecerEstado } = require('../../services/stateService');
+        const { ESTADOS_RESERVA } = require('../reservaConstants');
+        await establecerEstado(ctx.from, ESTADOS_RESERVA.FECHAS);
+        await flowDynamic('Has seleccionado reservar una cabaña. Por favor ingresa las fechas de tu estadía (ej: "20/08/2025 - 25/08/2025"):');
+        return endFlow();
+      }
+
       const cabaña = cabañas[seleccion - 1];
       const cabañaKey = cabaña.nombre.toLowerCase().includes('tortuga') ? 'tortuga' : 
                         cabaña.nombre.toLowerCase().includes('caracol') ? 'caracol' : 'tiburon';
-      
+
       // Enviar descripción en partes
       const descParts = CABANA_DESCRIPCIONES[cabañaKey].descripcion.split('\n\n');
       for (const part of descParts) {
         await flowDynamic(part);
       }
-      
+
       await flowDynamic('📅 Por favor, indica las fechas de tu estadía (ej: "15-18 agosto" o "15/08 - 18/08"):');
       return { cabañaSeleccionada: cabaña };
     }
@@ -286,7 +295,7 @@ const flowAlojamientos = addKeyword(['1', 'alojamiento', 'cabañas'])
         await flowDynamic('⚠️ Error: No se encontró la cabaña seleccionada. Por favor inicia de nuevo.');
         return endFlow();
       }
-      
+
       const fechas = parsearFechas(ctx.body);
       if (!fechas) {
         await flowDynamic('⚠️ Formato de fecha no reconocido. Por favor usa:\n' +
@@ -295,26 +304,26 @@ const flowAlojamientos = addKeyword(['1', 'alojamiento', 'cabañas'])
                          '- "15 al 18 de agosto"');
         return;
       }
-      
+
       // Validar fechas futuras
       if (fechas.entrada.isBefore(moment(), 'day')) {
         await flowDynamic('⚠️ La fecha de entrada no puede ser en el pasado.');
         return;
       }
-      
+
       // Validar estadía mínima (2 noches)
       const noches = fechas.salida.diff(fechas.entrada, 'days');
       if (noches < 2) {
         await flowDynamic('⚠️ La estadía mínima es de 2 noches.');
         return;
       }
-      
+
       const disponible = checkDisponibilidad(cabañaSeleccionada, fechas.entrada, fechas.salida);
       if (!disponible) {
         await flowDynamic(`⚠️ Lo sentimos, *${cabañaSeleccionada.nombre}* no está disponible del ${fechas.entrada.format('DD/MM')} al ${fechas.salida.format('DD/MM')}.`);
         return;
       }
-      
+
       await state.update({ 
         reservaTemporal: {
           cabañaId: cabañaSeleccionada.id,
@@ -323,7 +332,7 @@ const flowAlojamientos = addKeyword(['1', 'alojamiento', 'cabañas'])
           noches
         }
       });
-      
+
       await flowDynamic(`✅ *¡Disponible!*\n\n` +
         `*${cabañaSeleccionada.nombre}* disponible del ${fechas.entrada.format('DD/MM')} al ${fechas.salida.format('DD/MM')} (${noches} noches).\n\n` +
         `Por favor ingresa tu nombre completo para continuar:`);
@@ -337,13 +346,13 @@ const flowAlojamientos = addKeyword(['1', 'alojamiento', 'cabañas'])
         await flowDynamic('⚠️ Error: Información de reserva no encontrada. Por favor inicia de nuevo.');
         return endFlow();
       }
-      
+
       const nombre = ctx.body.trim();
       if (nombre.split(' ').length < 2 || nombre.length < 5) {
         await flowDynamic('⚠️ Por favor ingresa tu nombre completo (al menos nombre y apellido).');
         return;
       }
-      
+
       const reservaData = {
         nombre,
         fecha_inicio: reservaTemporal.fechas.entrada.format('YYYY-MM-DD'),
@@ -352,7 +361,7 @@ const flowAlojamientos = addKeyword(['1', 'alojamiento', 'cabañas'])
         timestamp: new Date().toISOString(),
         noches: reservaTemporal.noches
       };
-      
+
       const exito = await addReserva(reservaTemporal.cabañaId, reservaData);
       if (exito) {
         await flowDynamic(
