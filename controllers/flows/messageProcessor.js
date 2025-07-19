@@ -94,13 +94,30 @@ async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
             throw new Error('No se pudo determinar el número de teléfono del usuario');
         }
 
-        // Cargar cabañas para obtener cabinId
+        // Normalize phone number before querying
+        userId = normalizePhoneNumber(userId);
+
+        // Buscar reserva existente por teléfono
+        const existingReservation = await alojamientosService.getReservationByPhone(userId);
+
+        if (existingReservation) {
+            // Actualizar estado a pendiente
+            const success = await alojamientosService.updateReservationStatus(existingReservation.reservation_id, 'pendiente');
+            if (!success) {
+                throw new Error('Error al actualizar el estado de la reserva existente');
+            }
+            const userJid = `${userId}@s.whatsapp.net`;
+            await bot.sendMessage(remitente, { text: `✅ Reserva #${existingReservation.reservation_id} actualizada a estado pendiente.` });
+            await bot.sendMessage(userJid, { text: `✅ Tu reserva #${existingReservation.reservation_id} ha sido actualizada a estado pendiente.` });
+            return;
+        }
+
+        // Si no existe reserva, crear nueva
         const cabinsDataPath = path.join(__dirname, '../../data/cabañas.json');
         const cabinsJson = fs.readFileSync(cabinsDataPath, 'utf-8');
         const cabins = JSON.parse(cabinsJson);
         const cabinId = cabins[0].id;
 
-        // Crear datos de reserva mínimos
         const reservaData = {
             start_date: new Date().toISOString().split('T')[0],
             end_date: new Date().toISOString().split('T')[0],
@@ -108,7 +125,6 @@ async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
             total_price: 0
         };
 
-        // Crear reserva con usuario y obtener ID, pasando cabinId
         const result = await createReservationWithUser(userId, reservaData, cabinId);
 
         if (!result.success) {
@@ -119,17 +135,14 @@ async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
         const userJid = `${normalizePhoneNumber(userId)}@s.whatsapp.net`;
         const comandoReservado = `/reservado ${reservationId}`;
 
-        // Enviar confirmación al grupo
         await bot.sendMessage(GRUPO_JID, {
             text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${normalizePhoneNumber(userId)}\nID de reserva: ${reservationId}\n\nUsa este comando para confirmar la reserva:\n${comandoReservado}`
         });
 
-        // Enviar confirmación al usuario
         await bot.sendMessage(userJid, {
             text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${normalizePhoneNumber(userId)}\nID de reserva: ${reservationId}\n\nPara confirmar la reserva, el administrador debe usar este comando:\n${comandoReservado}`
         });
 
-        // Enviar instrucciones de depósito al usuario
         const depositInstructions = `Su reserva fue aprobada. Tiene 24 horas para enviar el comprobante de transferencia a los siguientes bancos:
 - Ficohsa
 - BAC
@@ -139,7 +152,6 @@ Puedes enviar la foto de la reserva en este chat o más adelante, seleccionando 
 
         await bot.sendMessage(userJid, { text: depositInstructions });
 
-        // Enviar mensaje de prueba al remitente original para verificar conectividad
         await bot.sendMessage(remitente, { text: 'Mensaje de prueba para verificar conectividad.' });
 
     } catch (error) {
@@ -242,14 +254,14 @@ async function handleReservadoCommand(bot, remitente, param) {
     }
 
     try {
-        const reserva = await Reserva.findById(param);
-        console.log('[DEBUG] Reserva fetched:', reserva);
+        const { getReservationDetailsById } = require('../../services/reservaService');
+        const reserva = await getReservationDetailsById(param);
+        console.log('[DEBUG] Reserva fetched with details:', reserva);
         if (!reserva) {
             await bot.sendMessage(remitente, { text: `❌ No se encontró reserva con ID ${param}` });
             return;
         }
 
-        console.log('[DEBUG] Reserva estado:', reserva.status);
         if (!reserva.status || reserva.status.trim().toLowerCase() !== 'pendiente') {
             await bot.sendMessage(remitente, { text: `⚠️ La reserva #${param} no está en estado pendiente.` });
             return;
@@ -263,8 +275,8 @@ async function handleReservadoCommand(bot, remitente, param) {
 
         await bot.sendMessage(remitente, { text: `✅ Reserva #${param} confirmada exitosamente.` });
 
-        // Enviar resumen detallado al grupo
-        await enviarReservaAlGrupo(bot, updatedReserva);
+        // Enviar resumen detallado al grupo con full details
+        await enviarReservaAlGrupo(bot, reserva);
     } catch (error) {
         console.error('[ERROR] handleReservadoCommand:', error);
         await bot.sendMessage(remitente, { text: '⚠️ Error procesando el comando /reservado. Intenta nuevamente.' });

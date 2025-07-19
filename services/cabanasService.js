@@ -1,5 +1,6 @@
 const path = require('path');
 const logger = require('../config/logger');
+const { runQuery } = require('../db');
 
 async function cargarCabanas() {
     try {
@@ -21,6 +22,24 @@ async function cargarCabanas() {
     }
 }
 
+async function getCabinIdByName(name) {
+    try {
+        const sql = 'SELECT cabin_id FROM Cabins WHERE name LIKE ? LIMIT 1';
+        const rows = await runQuery(sql, [name + '%']);
+        if (rows.length === 0) {
+            return null;
+        }
+        return rows[0].cabin_id;
+    } catch (error) {
+        logger.error(`Error buscando cabin_id por nombre: ${error.message}`, {
+            stack: error.stack,
+            module: 'getCabinIdByName'
+        });
+        throw new Error('Error al buscar ID de cabaña');
+    }
+}
+
 module.exports = {
-    cargarCabanas
+    cargarCabanas,
+    getCabinIdByName
 };

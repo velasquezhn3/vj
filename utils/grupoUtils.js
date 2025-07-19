@@ -8,16 +8,17 @@ async function enviarReservaAlGrupo(bot, reserva) {
     const resumen = 
 "📝 *NUEVA RESERVA - COMPROBANTE RECIBIDO*\n" +
 "--------------------------------------\n" +
-"🆔 ID: " + reserva._id + "\n" +
-"👤 Nombre: " + reserva.nombre + "\n" +
-"📞 Teléfono: " + reserva.telefono + "\n" +
-"📅 Fechas: " + reserva.fechaInicio.toISOString().split('T')[0] + " → " + reserva.fechaFin.toISOString().split('T')[0] + "\n" +
-"👥 Personas: " + reserva.personas + "\n" +
-"🏠 Alojamiento: " + reserva.alojamiento.nombre + "\n" +
-"💵 Total: $" + reserva.precioTotal + "\n" +
+"🆔 ID: " + reserva.reservation_id + "\n" +
+"👤 Nombre: " + (reserva.nombre || 'N/A') + "\n" +
+"📞 Teléfono: " + (reserva.telefono || 'N/A') + "\n" +
+"📅 Fechas: " + (reserva.fechaEntrada ? reserva.fechaEntrada : 'N/A') + " → " + (reserva.fechaSalida ? reserva.fechaSalida : 'N/A') + "\n" +
+"👥 Personas: " + (reserva.personas || 'N/A') + "\n" +
+"🏠 Alojamiento: " + (reserva.alojamiento || 'N/A') + "\n" +
+"💵 Total: $" + (reserva.precioTotal || 0) + "\n" +
 "--------------------------------------\n" +
-"✅ Usa /reservado " + reserva._id + " para confirmar\n" +
-"❌ Usa /cancelar " + reserva._id + " para rechazar\n";
+"✅ Usa /reservado " + reserva.reservation_id + " para confirmar\n" +
+"❌ Usa /cancelar " + reserva.reservation_id + " para rechazar\n";
+
 
     const textMessage = await bot.sendMessage(GRUPO_JID, { text: resumen });
 

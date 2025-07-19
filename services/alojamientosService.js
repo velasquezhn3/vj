@@ -219,6 +219,24 @@ async function getReservationById(reservationId) {
   }
 }
 
+async function getReservationByPhone(phoneNumber) {
+  try {
+    const sql = `
+      SELECT r.*, u.phone_number
+      FROM Reservations r
+      JOIN Users u ON r.user_id = u.user_id
+      WHERE u.phone_number = ?
+      ORDER BY r.created_at DESC
+      LIMIT 1
+    `;
+    const results = await db.runQuery(sql, [phoneNumber]);
+    return results.length > 0 ? results[0] : null;
+  } catch (e) {
+    console.error('Error fetching reservation by phone:', e);
+    return null;
+  }
+}
+
 module.exports = {
   loadCabañas,
   checkDisponibilidad,
@@ -232,6 +250,7 @@ module.exports = {
   loadReservations,
   getLatestPendingReservation,
   updateReservationStatus,
-  getReservationById
+  getReservationById,
+  getReservationByPhone
 };
 

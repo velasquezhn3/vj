@@ -1,6 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
 const usersService = require('./services/usersService');
 const alojamientosService = require('./services/alojamientosService');
@@ -34,30 +36,16 @@ app.put('/admin/users/:id', async (req, res) => {
   res.json({ success });
 });
 
+const adminCabinsController = require('./controllers/adminCabinsController');
+
 // Cabins routes
-app.get('/admin/cabins', async (req, res) => {
-  const cabins = await alojamientosService.loadCabañas();
-  res.json(cabins);
-});
+app.get('/admin/cabins', adminCabinsController.getAllCabanas);
 
-app.post('/admin/cabins', async (req, res) => {
-  const cabinData = req.body;
-  // For simplicity, assume cabins are added directly to DB (implement if needed)
-  res.json({ success: false, message: 'Create cabin not implemented yet' });
-});
+app.post('/admin/cabins', upload.single('photo'), adminCabinsController.createCabana);
 
-app.put('/admin/cabins/:id', async (req, res) => {
-  const cabinId = parseInt(req.params.id);
-  const cabinData = req.body;
-  const success = await alojamientosService.updateCabin(cabinId, cabinData);
-  res.json({ success });
-});
+app.put('/admin/cabins/:id', upload.single('photo'), adminCabinsController.updateCabana);
 
-app.delete('/admin/cabins/:id', async (req, res) => {
-  const cabinId = parseInt(req.params.id);
-  const success = await alojamientosService.deleteCabin(cabinId);
-  res.json({ success });
-});
+app.delete('/admin/cabins/:id', adminCabinsController.deleteCabana);
 
 // Reservations routes
 app.get('/admin/reservations', async (req, res) => {
@@ -85,6 +73,10 @@ app.delete('/admin/reservations/:id', async (req, res) => {
 });
 
 const conversationStatesService = require('./services/conversationStatesService');
+
+const adminDashboardRoutes = require('./routes/adminDashboard');
+
+app.use(adminDashboardRoutes);
 
 // Activities routes
 const fs = require('fs');

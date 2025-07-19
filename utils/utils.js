@@ -4,7 +4,7 @@ const path = require('path');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const streamToBuffer = require('stream-to-buffer');
 
-const GRUPO_JID = process.env.GRUPO_JID || '120363420483868468@g.us';
+const GRUPO_JID = process.env.GRUPO_JID || '120363401911054356@g.us';
 
 // Función auxiliar para convertir stream a buffer
 const streamToBufferPromise = (stream) => new Promise((resolve, reject) => {

@@ -47,8 +47,8 @@ async function createReservationWithUser(phoneNumber, reservaData, cabinId) {
 
         // Insert reservation with cabinId
         const insertReservaSql = `
-            INSERT INTO Reservations (user_id, cabin_id, start_date, end_date, status, total_price)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO Reservations (user_id, cabin_id, start_date, end_date, status, total_price, personas)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
         const insertResult = await runExecute(insertReservaSql, [
             user_id,
@@ -56,7 +56,8 @@ async function createReservationWithUser(phoneNumber, reservaData, cabinId) {
             reservaData.start_date,
             reservaData.end_date,
             reservaData.status,
-            reservaData.total_price
+            reservaData.total_price,
+            reservaData.personas || null
         ]);
 
         const reservationId = insertResult.lastID;
@@ -86,8 +87,45 @@ async function updateUserNameByPhone(phoneNumber, name) {
     }
 }
 
+/**
+ * Get reservation details by reservation ID, including user and cabin info.
+ * @param {number} reservationId 
+ * @returns {Promise<object|null>} reservation details or null if not found
+ */
+async function getReservationDetailsById(reservationId) {
+    const sql = `
+        SELECT 
+            r.reservation_id,
+            u.name AS nombre,
+            u.phone_number AS telefono,
+            r.total_price AS precioTotal,
+            r.start_date AS fechaEntrada,
+            r.end_date AS fechaSalida,
+            r.cabin_id AS alojamiento,
+            c.capacity AS personas,
+            r.status AS status
+        FROM Reservations r
+        JOIN Users u ON r.user_id = u.user_id
+        LEFT JOIN Cabins c ON r.cabin_id = c.cabin_id
+        WHERE r.reservation_id = ?
+    `;
+    try {
+        logger.info('getReservationDetailsById called with reservationId:', reservationId);
+        const rows = await runQuery(sql, [reservationId]);
+        logger.info('getReservationDetailsById query result rows:', rows);
+        if (rows.length === 0) {
+            return null;
+        }
+        return rows[0];
+    } catch (error) {
+        logger.error('Error fetching reservation details:', error);
+        return null;
+    }
+}
+
 module.exports = {
     createReservationWithUser,
     normalizePhoneNumber,
-    updateUserNameByPhone
+    updateUserNameByPhone,
+    getReservationDetailsById
 };
