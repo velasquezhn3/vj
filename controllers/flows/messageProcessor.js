@@ -108,7 +108,7 @@ async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
             }
             const userJid = `${userId}@s.whatsapp.net`;
             await bot.sendMessage(remitente, { text: `✅ Reserva #${existingReservation.reservation_id} actualizada a estado pendiente.` });
-            await bot.sendMessage(userJid, { text: `✅ Tu reserva #${existingReservation.reservation_id} ha sido actualizada a estado pendiente.` });
+            await bot.sendMessage(userJid, { text: `✅ Tu reserva #${existingReservation.reservation_id} ha sido actualizada a estado pendiente.Porfavor mandar comprobante del pago para poder completar la resrva ` });
             return;
         }
 
@@ -277,6 +277,42 @@ async function handleReservadoCommand(bot, remitente, param) {
 
         // Enviar resumen detallado al grupo con full details
         await enviarReservaAlGrupo(bot, reserva);
+
+        // Enviar mensaje privado al usuario con detalles de la reserva y mensaje cordial
+        const userJid = `${reserva.telefono}@s.whatsapp.net`;
+    const mensajePrivado = `
+🌟 ¡Hola ${reserva.nombre || 'Cliente'}!
+
+Gracias por confiar en nosotros. 🎉 *¡Tu reserva ha sido confirmada con éxito!*
+
+🔹 **Detalles de tu reserva:**
+   - 🗓️ Fechas: Del ${reserva.fechaEntrada || reserva.start_date} al ${reserva.fechaSalida || reserva.end_date}
+   - 👥 Personas: ${reserva.personas} ${reserva.personas > 1 ? 'huéspedes' : 'huésped'}
+   - 🏡 Alojamiento: ${reserva.alojamiento || 'Se asignará próximamente'}
+   - 💰 Precio total: $${reserva.precioTotal || reserva.total_price}
+   - 🔑 Código de reserva: ${param}
+
+💼 *Tu itinerario:*
+   • Día de llegada: Recepción a partir de las 02:00 PM
+   • Día de salida: Habitación disponible hasta las 11:00 AM
+
+📬 ¿Necesitas modificar algo o tienes preguntas? 
+   Estamos disponibles en:
+   📱 50499905880
+   📱 50499705022
+
+✨ ¡Preparamos todo con ilusión para darte una experiencia inolvidable! 
+Deseamos que tu estancia sea perfecta en cada detalle.
+
+Con cariño,
+El Equipo de Reservas 🏨💖
+
+ℹ️ *Información importante:*
+   - Importante 1
+   - Importante 2
+`;
+        await bot.sendMessage(userJid, { text: mensajePrivado.trim() });
+
     } catch (error) {
         console.error('[ERROR] handleReservadoCommand:', error);
         await bot.sendMessage(remitente, { text: '⚠️ Error procesando el comando /reservado. Intenta nuevamente.' });

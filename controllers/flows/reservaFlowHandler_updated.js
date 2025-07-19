@@ -144,7 +144,7 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                 await enviarAlGrupo(bot, resumen);
                 await enviarAlGrupo(bot, `/confirmar ${datos.telefono}`);
                 await bot.sendMessage(remitente, { 
-                    text: '📤 Reserva enviada para confirmación\n\n💳 *Por favor envía tu comprobante de pago:*' 
+                    text: '📤 Reserva enviada para confirmación\n\n 💳 *Porfavor esperar admistracion confirme su Reserva:*' 
                 });
 
                 // Obtener la última reserva pendiente para este teléfono y agregar su ID a datos
