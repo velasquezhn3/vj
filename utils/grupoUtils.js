@@ -27,17 +27,33 @@ async function enviarReservaAlGrupo(bot, reserva) {
 
       if (fs.existsSync(rutaAbsoluta)) {
         const buffer = fs.readFileSync(rutaAbsoluta);
+        const ext = path.extname(rutaAbsoluta).toLowerCase();
 
-        await bot.sendMessage(GRUPO_JID, {
-          document: buffer,
-          fileName: path.basename(rutaAbsoluta),
-          mimetype: 'application/pdf',
-          caption: "📎 Comprobante de pago - Reserva " + reserva._id
-        });
+        if (ext === '.pdf') {
+          await bot.sendMessage(GRUPO_JID, {
+            document: buffer,
+            fileName: path.basename(rutaAbsoluta),
+            mimetype: 'application/pdf',
+            caption: "📎 Comprobante de pago - Reserva " + reserva._id
+          });
+        } else if (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.gif') {
+          await bot.sendMessage(GRUPO_JID, {
+            image: buffer,
+            caption: "📎 Comprobante de pago - Reserva " + reserva._id
+          });
+        } else {
+          console.warn("[Grupo] Tipo de archivo no soportado para comprobante: " + ext);
+        }
       } else {
         console.warn("[Grupo] Archivo no encontrado: " + rutaAbsoluta);
       }
+
+      // Send separate message with /reservado command and reservation id after sending comprobante
+      await bot.sendMessage(GRUPO_JID, { text: "/reservado " + reserva.reservation_id });
     }
+
+    // Send separate message with /reservado command and reservation id
+    // await bot.sendMessage(GRUPO_JID, { text: "/reservado " + reserva.reservation_id });
 
     await Reserva.findByIdAndUpdate(reserva._id, {
       grupoMessageId: textMessage.key.id

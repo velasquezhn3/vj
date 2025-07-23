@@ -136,13 +136,9 @@ async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
         const comandoReservado = `/reservado ${reservationId}`;
 
         await bot.sendMessage(GRUPO_JID, {
-            text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${normalizePhoneNumber(userId)}\nID de reserva: ${reservationId}\n\nUsa este comando para confirmar la reserva:\n${comandoReservado}`
-        });
-
-        await bot.sendMessage(userJid, {
-            text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${normalizePhoneNumber(userId)}\nID de reserva: ${reservationId}\n\nPara confirmar la reserva, el administrador debe usar este comando:\n${comandoReservado}`
-        });
-
+            text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${normalizePhoneNumber(userId)}\nID de reserva: ${reservationId}\n`
+        }); 
+       
         const depositInstructions = `Su reserva fue aprobada. Tiene 24 horas para enviar el comprobante de transferencia a los siguientes bancos:
 - Ficohsa
 - BAC
@@ -376,10 +372,32 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
         const hasDocument = mensajeObj?.message?.documentMessage || mensajeObj?.documentMessage;
 
         if ((estado === ESTADOS_RESERVA.ESPERANDO_CONFIRMACION || estado === ESTADOS_RESERVA.ESPERANDO_PAGO) && (hasImage || hasDocument)) {
-            logger.info(`Estado ${estado} y mensaje con imagen o documento detectado, reenviando comprobante al grupo.`);
-            // Forward deposit receipt to group
-            await reenviarComprobanteAlGrupo(bot, mensajeObj, datos);
-            return;
+        logger.info(`Estado ${estado} y mensaje con imagen o documento detectado, reenviando comprobante al grupo.`);
+        // Forward deposit receipt to group
+        await reenviarComprobanteAlGrupo(bot, mensajeObj, datos);
+
+        // Enviar comando /reservado con id de reserva en mensaje aparte
+        try {
+          let idReserva = null;
+          if (datos && (datos.reservation_id || datos._id)) {
+            idReserva = datos.reservation_id || datos._id;
+          } else if (datos && datos.telefono) {
+            // Buscar reserva por teléfono
+            const reserva = await alojamientosService.getReservationByPhone(datos.telefono);
+            if (reserva && (reserva.reservation_id || reserva._id)) {
+              idReserva = reserva.reservation_id || reserva._id;
+            }
+          }
+          if (idReserva) {
+            console.log(`[DEBUG] Enviando comando /reservado ${idReserva}`);
+            await bot.sendMessage(GRUPO_JID, { text: `/reservado ${idReserva}` });
+            console.log(`[DEBUG] Comando /reservado enviado correctamente`);
+          }
+        } catch (error) {
+          console.error(`[ERROR] Error enviando comando /reservado: ${error.message}`);
+        }
+
+        return;
         }
 
         // Router de estados
