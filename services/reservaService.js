@@ -104,10 +104,12 @@ async function upsertUser(phoneNumber, name) {
         // Try to update first
         const updateSql = `UPDATE Users SET name = ? WHERE phone_number = ?`;
         const updateResult = await runExecute(updateSql, [name, normalizedPhone]);
+        console.log(`[DEBUG] upsertUser updateResult:`, updateResult);
         if (updateResult.changes === 0) {
             // No rows updated, insert new user
             const insertSql = `INSERT INTO Users (phone_number, name) VALUES (?, ?)`;
-            await runExecute(insertSql, [normalizedPhone, name]);
+            const insertResult = await runExecute(insertSql, [normalizedPhone, name]);
+            console.log(`[DEBUG] upsertUser insertResult:`, insertResult);
         }
         return { success: true };
     } catch (error) {
@@ -167,11 +169,55 @@ async function updateComprobante(reservationId, comprobanteData, comprobanteCont
     }
 }
 
+async function updateReservationPrice(reservationId, totalPrice) {
+    try {
+        const sql = `
+            UPDATE Reservations
+            SET total_price = ?, updated_at = datetime('now')
+            WHERE reservation_id = ?
+        `;
+        await runExecute(sql, [totalPrice, reservationId]);
+        return { success: true };
+    } catch (error) {
+        logger.error('Error updating reservation price:', error);
+        return { success: false, error: error.message || 'Error desconocido' };
+    }
+}
+
+async function getUserByPhone(phoneNumber) {
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (!normalizedPhone) {
+        return null;
+    }
+    try {
+        const sql = `SELECT * FROM Users WHERE phone_number = ?`;
+        const rows = await runQuery(sql, [normalizedPhone]);
+        return rows.length > 0 ? rows[0] : null;
+    } catch (error) {
+        logger.error('Error fetching user by phone:', error);
+        return null;
+    }
+}
+
+async function getReservationById(reservationId) {
+    try {
+        const sql = `SELECT * FROM Reservations WHERE reservation_id = ?`;
+        const rows = await runQuery(sql, [reservationId]);
+        return rows.length > 0 ? rows[0] : null;
+    } catch (error) {
+        logger.error('Error fetching reservation by ID:', error);
+        return null;
+    }
+}
+
 module.exports = {
     createReservationWithUser,
     normalizePhoneNumber,
     updateUserNameByPhone,
     getReservationDetailsById,
     updateComprobante,
-    upsertUser
+    upsertUser,
+    updateReservationPrice,
+    getUserByPhone,
+    getReservationById
 };

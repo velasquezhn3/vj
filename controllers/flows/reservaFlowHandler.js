@@ -33,6 +33,7 @@ const asignarAlojamiento = (personas) => {
 
 async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje) {
     try {
+        console.log(`[TRACE] handleReservaState called with estado=${estado}, datos=`, datos);
         switch (estado) {
             case ESTADOS_RESERVA.FECHAS: {
                 const { entrada, salida } = parsearFechas(mensajeTexto);
@@ -76,6 +77,7 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
             case ESTADOS_RESERVA.NOMBRE: {
                 const telefono = remitente.split('@')[0];
                 await bot.sendMessage(remitente, { text: '👥 *¿Cuántas personas serán?*' });
+                console.log(`[TRACE] Setting nombre=${mensajeTexto.trim()} and telefono=${telefono} in datos`);
                 await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { 
                     ...datos, 
                     nombre: mensajeTexto.trim(),
@@ -111,7 +113,7 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                         datos.fechaEntrada, 
                         datos.noches
                     );
-                    
+                    console.log(`[TRACE] Calculated precioTotal=${precioTotal}`);
                     await bot.sendMessage(remitente, { 
                         text: `💵 *Precio total:* $${precioTotal}\n\n📄 *¿Aceptas las condiciones de uso?* (responde *sí* o *no*)` 
                     });

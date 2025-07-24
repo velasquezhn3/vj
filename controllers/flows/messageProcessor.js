@@ -13,6 +13,7 @@ const { reenviarComprobanteAlGrupo, GRUPO_JID, enviarAlGrupo, safeSend } = requi
 const alojamientosService = require('../../services/alojamientosService');
 const Reserva = require('../../models/Reserva');
 const { runQuery } = require('../../db');
+const { upsertUser } = require('../../services/reservaService');
 
 // Helper function to send detailed reservation info to group
 async function enviarReservaAlGrupo(bot, reserva) {
@@ -76,13 +77,13 @@ async function handleGroupCommand(bot, remitente, mensajeTexto, mensajeObj) {
 const fs = require('fs');
 const path = require('path');
 
-const { createReservationWithUser, normalizePhoneNumber } = require('../../services/reservaService');
+const { createReservationWithUser, normalizePhoneNumber, updateReservationPrice } = require('../../services/reservaService');
 
 async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
     try {
         logger.info(`Comando /confirmar recibido con parámetro: ${param || 'ninguno'}`);
 
-        // Determinar userId: si el comando viene de un grupo, extraer de param limpiando sufijo @s.whatsapp.net, si no usar param tal cual
+        // Determine userId: if command comes from a group, extract from param cleaning suffix @s.whatsapp.net, else use param as is
         let userId;
         if (remitente.endsWith('@g.us')) {
             userId = param ? param.replace(/@s\.whatsapp\.net$/, '') : undefined;
@@ -97,14 +98,59 @@ async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
         // Normalize phone number before querying
         userId = normalizePhoneNumber(userId);
 
-        // Buscar reserva existente por teléfono
+        // Fetch user state by userId (phone number) instead of remitente (group JID)
+        const latestState = obtenerEstado(userId + '@s.whatsapp.net');
+        const datos = latestState?.datos || {};
+        let userName = datos.nombre || null;
+        let totalPrice = datos.precioTotal || 0;
+        let fechaEntrada = datos.fechaEntrada || null;
+        let fechaSalida = datos.fechaSalida || null;
+        let alojamiento = datos.alojamiento || null;
+        let personas = datos.personas || null;
+
+        // Defensive: Ensure userName and totalPrice are valid
+        if (typeof userName !== 'string' || userName.trim() === '') {
+            userName = null;
+        }
+        if (typeof totalPrice !== 'number' || totalPrice < 0) {
+            totalPrice = 0;
+        }
+
+        console.log(`[TRACE] handleConfirmarCommand datos.nombre:`, userName);
+        console.log(`[TRACE] handleConfirmarCommand datos.precioTotal:`, totalPrice);
+        console.log(`[TRACE] handleConfirmarCommand datos.fechaEntrada:`, fechaEntrada);
+        console.log(`[TRACE] handleConfirmarCommand datos.fechaSalida:`, fechaSalida);
+        console.log(`[TRACE] handleConfirmarCommand datos.alojamiento:`, alojamiento);
+
+        // Save or update user name in DB
+        if (userName) {
+            console.log(`[TRACE] Calling upsertUser with userId=${userId}, userName=${userName}`);
+            const upsertResult = await upsertUser(userId, userName);
+            console.log(`[TRACE] upsertUser result:`, upsertResult);
+            if (!upsertResult.success) {
+                throw new Error('Error al guardar el nombre de usuario');
+            }
+            // Diagnostic: check if user name saved
+            const { getUserByPhone } = require('../../services/reservaService');
+            const userRecord = await getUserByPhone(userId);
+            console.log('[TRACE] User record after upsertUser:', userRecord);
+        }
+
+        // Search for existing reservation by phone
         const existingReservation = await alojamientosService.getReservationByPhone(userId);
 
         if (existingReservation) {
-            // Actualizar estado a pendiente
-            const success = await alojamientosService.updateReservationStatus(existingReservation.reservation_id, 'pendiente');
-            if (!success) {
-                throw new Error('Error al actualizar el estado de la reserva existente');
+            // Update reservation with new price and status
+            console.log(`[TRACE] Calling alojamientosService.updateReservation with reservation_id=${existingReservation.reservation_id}, total_price=${totalPrice}`);
+            const updated = await alojamientosService.updateReservation(existingReservation.reservation_id, {
+                start_date: existingReservation.start_date,
+                end_date: existingReservation.end_date,
+                status: 'pendiente',
+                total_price: totalPrice
+            });
+            console.log(`[TRACE] updateReservation result:`, updated);
+            if (!updated) {
+                throw new Error('Error al actualizar la reserva existente');
             }
             const userJid = `${userId}@s.whatsapp.net`;
             await bot.sendMessage(remitente, { text: `✅ Reserva #${existingReservation.reservation_id} actualizada a estado pendiente.` });
@@ -112,26 +158,46 @@ async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
             return;
         }
 
-        // Si no existe reserva, crear nueva
+        // If no existing reservation, create new
         const cabinsDataPath = path.join(__dirname, '../../data/cabañas.json');
         const cabinsJson = fs.readFileSync(cabinsDataPath, 'utf-8');
         const cabins = JSON.parse(cabinsJson);
-        const cabinId = cabins[0].id;
+
+        // Find cabinId matching alojamiento name from datos
+        let cabinId = null;
+        if (alojamiento) {
+            const cabinMatch = cabins.find(c => c.nombre === alojamiento || c.name === alojamiento);
+            if (cabinMatch) {
+                cabinId = cabinMatch.id || cabinMatch.cabin_id;
+            }
+        }
+        if (!cabinId && cabins.length > 0) {
+            cabinId = cabins[0].id || cabins[0].cabin_id;
+        }
 
         const reservaData = {
-            start_date: new Date().toISOString().split('T')[0],
-            end_date: new Date().toISOString().split('T')[0],
+            start_date: fechaEntrada || new Date().toISOString().split('T')[0],
+            end_date: fechaSalida || new Date().toISOString().split('T')[0],
             status: 'pendiente',
-            total_price: 0
+            total_price: totalPrice,
+            personas: personas
         };
 
+        console.log(`[TRACE] Calling createReservationWithUser with userId=${userId}, cabinId=${cabinId}, totalPrice=${totalPrice}`);
         const result = await createReservationWithUser(userId, reservaData, cabinId);
+        console.log(`[TRACE] createReservationWithUser result:`, result);
 
         if (!result.success) {
             throw new Error(result.error || 'Error al guardar la reserva');
         }
 
         const reservationId = result.reservationId;
+
+        // Fetch reservation details after creation for verification
+        const { getReservationDetailsById } = require('../../services/reservaService');
+        const reserva = await getReservationDetailsById(reservationId);
+        console.log('[TRACE] Reserva details after creation:', reserva);
+
         const userJid = `${normalizePhoneNumber(userId)}@s.whatsapp.net`;
         const comandoReservado = `/reservado ${reservationId}`;
 
