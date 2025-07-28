@@ -24,11 +24,14 @@ function runQuery(sql, params = []) {
 }
 
 function runExecute(sql, params = []) {
+  console.log('[DB] Executing SQL:', sql, 'with params:', params);
   return new Promise((resolve, reject) => {
     db.run(sql, params, function(err) {
       if (err) {
+        console.error('[DB] Error executing SQL:', err);
         reject(err);
       } else {
+        console.log('[DB] SQL executed successfully. lastID:', this.lastID, 'changes:', this.changes);
         resolve({ lastID: this.lastID, changes: this.changes });
       }
     });

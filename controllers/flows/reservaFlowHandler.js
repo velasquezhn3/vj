@@ -152,13 +152,8 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                     text: '📤 Reserva enviada para confirmación\n\n 💳 *Porfavor esperar admistracion confirme su Reserva:*' 
                 });
 
-                // Obtener la última reserva pendiente para este teléfono y agregar su ID a datos
-                const reservaPendiente = await alojamientosService.getLatestPendingReservation();
-                if (reservaPendiente) {
-                    datos.reservaId = reservaPendiente.reservation_id;
-                } else {
-                    console.error('No se encontró reserva pendiente para asignar ID en datos');
-                }
+                // Remove fetching latest pending reservation here to avoid reusing old reservation ID
+                // The reservation will be created in handleConfirmarCommand and state updated accordingly
                 
                 await establecerEstado(remitente, ESTADOS_RESERVA.ESPERANDO_PAGO, datos);
                 break;

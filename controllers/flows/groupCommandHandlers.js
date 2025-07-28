@@ -185,25 +185,8 @@ async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
             }
         }
 
-        // Search for existing reservation by phone
-        const existingReservation = await alojamientosService.getReservationByPhone(userId);
-
-        if (existingReservation) {
-            // Update reservation with new price and status
-            const updated = await alojamientosService.updateReservation(existingReservation.reservation_id, {
-                start_date: existingReservation.start_date,
-                end_date: existingReservation.end_date,
-                status: 'pendiente',
-                total_price: totalPrice
-            });
-            if (!updated) {
-                throw new Error('Error al actualizar la reserva existente');
-            }
-            const userJid = `${userId}@s.whatsapp.net`;
-            await bot.sendMessage(remitente, { text: `✅ Reserva #${existingReservation.reservation_id} actualizada a estado pendiente.` });
-            await bot.sendMessage(userJid, { text: `✅ Tu reserva #${existingReservation.reservation_id} ha sido actualizada a estado pendiente.Porfavor mandar comprobante del pago para poder completar la resrva ` });
-            return;
-        }
+        // Removed existing reservation check to allow multiple reservations per user
+        // Always create a new reservation
 
         // If no existing reservation, create new
         const cabinsDataPath = path.join(__dirname, '../../data/cabañas.json');

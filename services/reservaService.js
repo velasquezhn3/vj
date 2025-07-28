@@ -60,7 +60,10 @@ async function createReservationWithUser(phoneNumber, reservaData, cabinId) {
             reservaData.personas || null
         ]);
 
+        logger.info('[DEBUG] Insert reservation result:', insertResult);
         const reservationId = insertResult.lastID;
+        logger.info('[DEBUG] New reservation ID:', reservationId);
+
         if (!reservationId) {
             return { success: false, error: 'No se pudo obtener ID de reserva' };
         }
