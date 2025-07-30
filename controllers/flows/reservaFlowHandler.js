@@ -7,16 +7,9 @@ const { enviarReservaAlGrupo } = require('../../utils/grupoUtils');
 const { ESTADOS_RESERVA } = require('../reservaConstants');
 const { createReservationWithUser, normalizePhoneNumber } = require('../../services/reservaService');
 const alojamientosService = require('../../services/alojamientosService');
+const { parseDateRange } = require('../../utils/dateRangeParser');
 
 // Funciones auxiliares para mejorar la legibilidad
-const parsearFechas = (texto) => {
-    const [entrada, salida] = texto.split('-').map(s => s.trim());
-    return { entrada, salida };
-};
-
-const validarFormatoFecha = (fecha) => {
-    return /^\d{2}\/\d{2}\/\d{4}$/.test(fecha);
-};
 
 const calcularDiferenciaDias = (entrada, salida) => {
     const fechaEntrada = new Date(entrada.split('/').reverse().join('-'));
@@ -34,43 +27,40 @@ const asignarAlojamiento = (personas) => {
 async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje) {
     try {
         console.log(`[TRACE] handleReservaState called with estado=${estado}, datos=`, datos);
+        console.log(`[DEBUG] Mensaje recibido para fechas: '${mensajeTexto}'`);
         switch (estado) {
             case ESTADOS_RESERVA.FECHAS: {
-                const { entrada, salida } = parsearFechas(mensajeTexto);
-                
-                if (!entrada || !salida) {
-                    await bot.sendMessage(remitente, { text: '❌ Formato incorrecto. Usa: *20/08/2025 - 25/08/2025*' });
+                const resultado = parseDateRange(mensajeTexto);
+                console.log('[DEBUG] Resultado parseDateRange:', resultado);
+                if (resultado.error) {
+                    await bot.sendMessage(remitente, { text: `❌ ${resultado.error} Intenta con otro formato, ejemplo: *20/08/2025 al 25/08/2025*` });
                     return;
                 }
-                
-                if (!validarFormatoFecha(entrada) || !validarFormatoFecha(salida)) {
-                    await bot.sendMessage(remitente, { text: '📅 Formato de fecha inválido. Usa *DD/MM/AAAA*' });
-                    return;
-                }
-                
+                const { entrada, salida, mensaje } = resultado;
                 const noches = calcularDiferenciaDias(entrada, salida);
-                
                 if (noches < 1) {
                     await bot.sendMessage(remitente, { text: '❌ La fecha de salida debe ser *posterior* a la entrada' });
                     return;
                 }
-                
-                const disponible = true; 
-                
-                if (!disponible) {
-                    await bot.sendMessage(remitente, { text: '❌ Fechas no disponibles. Intenta con otras:' });
-                    return;
+                // Confirmar fechas con el usuario
+                await bot.sendMessage(remitente, { text: mensaje });
+                // Guardar fechas temporalmente y esperar confirmación
+                await establecerEstado(remitente, ESTADOS_RESERVA.CONFIRMAR_FECHAS, {
+                    fechaEntrada: entrada,
+                    fechaSalida: salida,
+                    noches
+                });
+                break;
+            }
+            case ESTADOS_RESERVA.CONFIRMAR_FECHAS: {
+                if (mensajeTexto.trim().toLowerCase() === 'sí' || mensajeTexto.trim().toLowerCase() === 'si') {
+                    // Continúa el flujo, no vuelve a preguntar fechas
+                    await bot.sendMessage(remitente, { text: '✅ *¡Fechas confirmadas!*\n📝 *Por favor, dime tu nombre completo:*' });
+                    await establecerEstado(remitente, ESTADOS_RESERVA.NOMBRE, datos);
+                } else {
+                    await bot.sendMessage(remitente, { text: '❌ Fechas no confirmadas. Por favor, ingresa nuevamente el rango de fechas.' });
+                    await establecerEstado(remitente, ESTADOS_RESERVA.FECHAS, {});
                 }
-                
-                await bot.sendMessage(remitente, { 
-                    text: `✅ *¡Fechas disponibles!*\n${noches} noches seleccionadas\n\n📝 *Por favor, dime tu nombre completo:*` 
-                });
-                
-                await establecerEstado(remitente, ESTADOS_RESERVA.NOMBRE, { 
-                    fechaEntrada: entrada, 
-                    fechaSalida: salida, 
-                    noches 
-                });
                 break;
             }
 

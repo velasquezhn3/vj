@@ -3,6 +3,7 @@
  */
 const ESTADOS_RESERVA = {
   FECHAS: 'reservar_fechas',
+  CONFIRMAR_FECHAS: 'reservar_confirmar_fechas',
   NOMBRE: 'reservar_nombre',
   TELEFONO: 'reservar_telefono',
   PERSONAS: 'reservar_personas',

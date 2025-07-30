@@ -92,7 +92,9 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
             LISTA_CABAÑAS: () => handleMenuState(bot, remitente, mensajeTexto, estado, establecerEstado),
             DETALLE_CABAÑA: () => handleMenuState(bot, remitente, mensajeTexto, estado, establecerEstado),
             actividades: () => handleActividadesState(bot, remitente, mensajeTexto),
+            // Flujo de reserva
             [ESTADOS_RESERVA.FECHAS]: () => handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje),
+            [ESTADOS_RESERVA.CONFIRMAR_FECHAS]: () => handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje),
             [ESTADOS_RESERVA.NOMBRE]: () => handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje),
             [ESTADOS_RESERVA.TELEFONO]: () => handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje),
             [ESTADOS_RESERVA.PERSONAS]: () => handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje),
@@ -106,12 +108,12 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
         if (handler) {
             await handler();
         } else {
+            // Si el estado no es manejado, muestra advertencia y regresa al menú principal
             logger.warn(`Estado no manejado: ${estado}`, { userId: remitente });
             await bot.sendMessage(remitente, {
-                text: '⚠️ Estado no reconocido. Reiniciando tu sesión...'
+                text: '⚠️ Estado no reconocido. Te regreso al menú principal.'
             });
-            establecerEstado(remitente, 'MENU_PRINCIPAL');
-            await enviarMenuPrincipal(bot, remitente);
+            await establecerEstado(remitente, 'MENU_PRINCIPAL', {});
         }
     } catch (error) {
         logger.error(`Error procesando mensaje de ${remitente}: ${error.message}`, {
