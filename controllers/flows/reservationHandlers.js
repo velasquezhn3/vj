@@ -465,6 +465,61 @@ async function handleConfirmarCommandRobust(bot, remitente, param, mensajeObj) {
         
         logger.info('✅ [CONFIRMAR ROBUSTO] Reserva creada exitosamente con failsafe');
         
+        // Enviar mensaje privado de confirmación al usuario
+        const mensajeConfirmacion = `
+🎉 *¡FELICIDADES! Tu reserva ha sido APROBADA con éxito* 🎉
+
+🌟 Estimado/a ${userName}, 
+
+¡Gracias por confiar en nosotros! Tu reserva ha sido procesada exitosamente y está ahora CONFIRMADA.
+
+⏰ *IMPORTANTE - PLAZO DE PAGO:*
+Tienes *24 HORAS* para realizar el depósito del *50%* del total de tu reserva para asegurar tu estadía.
+
+💳 *DATOS BANCARIOS PARA DEPÓSITO:*
+
+🏦 *BANCO ATLÁNTIDA*
+   📱 Número de cuenta: 1234567890
+   💳 Tipo: Cuenta de Ahorros
+   👤 A nombre de: Villa Jardines S.A.
+   🆔 RTN: 08011998765432
+
+🏦 *BAC HONDURAS*
+   📱 Número de cuenta: 0987654321
+   💳 Tipo: Cuenta Corriente  
+   👤 A nombre de: Villa Jardines S.A.
+   🆔 RTN: 08011998765432
+
+🏦 *BANCO OCCIDENTE*
+   📱 Número de cuenta: 5566778899
+   💳 Tipo: Cuenta de Ahorros
+   👤 A nombre de: Villa Jardines S.A.
+   🆔 RTN: 08011998765432
+
+📋 *INSTRUCCIONES DE PAGO:*
+1️⃣ Realiza la transferencia por el 50% del monto total
+2️⃣ Envía el comprobante de pago a este número
+3️⃣ Confirmaremos tu pago en un máximo de 2 horas
+
+⚠️ *NOTA IMPORTANTE:*
+Si no se recibe el depósito en las próximas 24 horas, la reserva será cancelada automáticamente.
+
+📞 *¿Tienes dudas?*
+Contáctanos al: 📱 +504 9990-5880
+
+¡Estamos emocionados de recibirte pronto! 🏨✨
+
+Con cariño,
+El Equipo de Reservas Vj 💚
+`;
+        
+        try {
+          await bot.sendMessage(userJid, { text: mensajeConfirmacion.trim() });
+          logger.info(`✅ Mensaje de confirmación enviado al usuario ${userId}`);
+        } catch (msgError) {
+          logger.error('❌ Error enviando mensaje de confirmación:', msgError);
+        }
+        
       } else {
         await safeSend(bot, remitente, '❌ No se pudo identificar el usuario');
       }

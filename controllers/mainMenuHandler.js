@@ -2,7 +2,8 @@ const cabañas = require('../data/cabañas.json');
 const actividadesData = require('../data/actividades.json');
 const WeatherModule = require('../services/weatherService');
 const { sendShareExperienceInstructions } = require('../routes/shareExperience');
-const { manejarPostReserva } = require('../routes/postReservaHandler');
+// const { manejarPostReserva } = require('../routes/postReservaHandler'); // TEMPORALMENTE COMENTADO
+const { extraerTelefono } = require('../utils/telefonoUtils');
 
 const weatherModule = new WeatherModule('5a9417f67be807a6e981ec69173924ac');
 
@@ -72,7 +73,7 @@ async function handleMainMenuOptions(bot, remitente, mensaje, establecerEstado) 
 
     case '2': // Reservar
       await safeSend(bot, remitente, 
-        '📅 *Reservar Ahora*:\nIndica fechas (DD/MM/AAAA - DD/MM/AAAA)\nEj: 20/08/2025 - 25/08/2025'
+        '✨ *¡Reserva tu experiencia perfecta!* ✨\n🗓️ Solo compártenos tus fechas favoritas\n💫 Ejemplo: 20/08/2025 - 25/08/2025 o del 20 al 25 de agosto'
       );
       await establecerEstado(remitente, STATES.DATES);
       break;
@@ -133,6 +134,110 @@ async function handleMainMenuOptions(bot, remitente, mensaje, establecerEstado) 
     default: // Opción inválida
       await safeSend(bot, remitente, '❌ Opción inválida. Usa el menú numérico.');
       break;
+  }
+}
+
+// FUNCIÓN TEMPORAL PARA OPCIÓN 8 (POST RESERVA)
+async function manejarPostReserva(bot, remitente, mensaje, establecerEstado) {
+  console.log('### FUNCIÓN manejarPostReserva LLAMADA ###');
+  console.log('### PARÁMETROS:', { remitente, mensaje });
+  
+  try {
+    const telefono = extraerTelefono(remitente);
+    console.log('### TELÉFONO EXTRAÍDO:', telefono);
+    
+    const reserva = await buscarReservaActivaOPendiente(telefono);
+    console.log('### RESERVA ENCONTRADA:', reserva);
+    
+    if (!reserva) {
+      await bot.sendMessage(remitente, {
+        text: '⚠️ No encontramos reservas activas o pendientes asociadas a este número.\n\n' +
+              '🔹 Solo pueden acceder usuarios con:\n' +
+              '   • Reservas activas (confirmadas)\n' +
+              '   • Reservas pendientes (esperando comprobante)\n\n' +
+              '1. Hablar con un agente\n' +
+              '2. Volver al menú principal\n\n' +
+              'Por favor, responde con 1 o 2.\n\nEscribe "menu" para ir al menú principal.'
+      });
+      await establecerEstado(remitente, 'post_reserva_no_reserva');
+      return;
+    }
+
+    if (mensaje === '8') {
+      let menuTexto = '🎯 *AYUDA POST RESERVA*\n\n';
+      
+      if (reserva.tipo === 'pendiente') {
+        menuTexto += '📋 Estado: *Pendiente de comprobante*\n';
+        menuTexto += `📅 Reserva ID: ${reserva.reservation_id}\n`;
+        menuTexto += `👤 Huésped: ${reserva.guest_name}\n\n`;
+        menuTexto += '1. 📎 Enviar Comprobante\n';
+      } else {
+        menuTexto += '📋 Estado: *Reserva confirmada*\n';
+        menuTexto += `📅 Reserva ID: ${reserva.reservation_id}\n`;
+        menuTexto += `👤 Huésped: ${reserva.guest_name}\n\n`;
+        menuTexto += '1. 🔐 Información de acceso\n';
+      }
+      
+      menuTexto += '2. ✏️ Modificar reserva\n';
+      menuTexto += '3. ❌ Cancelar reserva\n';
+      menuTexto += '4. 🆘 Solicitar asistencia\n\n';
+      menuTexto += 'Responde con el número de tu opción.\n\nEscribe "menu" para ir al menú principal.';
+      
+      console.log('### ENVIANDO MENÚ ###');
+      await bot.sendMessage(remitente, { text: menuTexto });
+      await establecerEstado(remitente, 'post_reserva_menu', { reserva });
+      console.log('### MENÚ ENVIADO Y ESTADO ESTABLECIDO ###');
+      return;
+    }
+    
+  } catch (error) {
+    console.error('Error en manejarPostReserva:', error);
+    await bot.sendMessage(remitente, {
+      text: 'Lo siento, ocurrió un error. Por favor intenta de nuevo más tarde.\n\nEscribe "menu" para ir al menú principal.'
+    });
+  }
+}
+
+// Función auxiliar para buscar reservas
+async function buscarReservaActivaOPendiente(telefono) {
+  console.log('### EJECUTANDO buscarReservaActivaOPendiente ###');
+  console.log('### TELEFONO:', telefono);
+  
+  try {
+    const { runQuery } = require('../db');
+    
+    const sql = `
+      SELECT r.*, u.name as guest_name, u.phone_number,
+             r.start_date as check_in_date, r.end_date as check_out_date
+      FROM Reservations r
+      JOIN Users u ON r.user_id = u.user_id
+      WHERE u.phone_number = ? AND r.status IN ('confirmada', 'confirmado', 'pendiente')
+      ORDER BY r.created_at DESC
+      LIMIT 1
+    `;
+    
+    console.log('[DEBUG] SQL:', sql);
+    const rows = await runQuery(sql, [telefono]);
+    console.log('[DEBUG] Rows:', rows);
+    
+    if (rows && rows.length > 0) {
+      const reserva = rows[0];
+      
+      let tipo = 'activa';
+      if (reserva.status === 'pendiente') {
+        tipo = 'pendiente';
+      }
+      
+      const resultado = { ...reserva, tipo };
+      console.log('[DEBUG] Resultado:', resultado);
+      return resultado;
+    }
+
+    console.log('[DEBUG] No reservas encontradas');
+    return null;
+  } catch (error) {
+    console.error('Error buscando reserva:', error);
+    return null;
   }
 }
 

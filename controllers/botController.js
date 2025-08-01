@@ -4,6 +4,7 @@ const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 const { procesarMensaje } = require('./messageHandler');
+const reservaCleanupService = require('../services/reservaCleanupService');
 
 // Variables globales para control de reconexión
 let reconnectAttempts = 0;
@@ -147,6 +148,11 @@ async function startBot() {
     });
 
     console.log('🚀 Bot iniciado correctamente');
+    
+    // Iniciar servicio de limpieza automática de reservas
+    console.log('🧹 Iniciando servicio de limpieza de reservas...');
+    reservaCleanupService.iniciar();
+    
   } catch (startError) {
     console.error('⛔ Error crítico al iniciar bot:', startError);
     scheduleReconnect();

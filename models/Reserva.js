@@ -23,7 +23,7 @@ async function findByPhoneAndStatus(phone, status) {
 async function updateComprobante(id, buffer, contentType, nombreArchivo) {
   // Now nombreArchivo is the relative file path string, buffer and contentType are null
   const sql = `UPDATE ${TABLE_NAME} SET status = ?, comprobante_nombre_archivo = ? WHERE reservation_id = ?`;
-  const params = ['comprobante_recibido', nombreArchivo, id];
+  const params = ['pendiente', nombreArchivo, id];
   await runExecute(sql, params);
   return findById(id);
 }

@@ -103,8 +103,8 @@ async function createReservationWithUser(phoneNumber, reservaData, cabinId) {
 
         // Insert reservation solo con cabin_id real
         const insertReservaSql = `
-            INSERT INTO Reservations (user_id, cabin_id, start_date, end_date, status, total_price, personas)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO Reservations (user_id, cabin_id, start_date, end_date, status, total_price, personas, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
         `;
         const insertResult = await runExecute(insertReservaSql, [
             user_id,

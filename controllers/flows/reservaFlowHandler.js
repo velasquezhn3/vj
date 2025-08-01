@@ -44,6 +44,17 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                 }
                 // Confirmar fechas con el usuario
                 await bot.sendMessage(remitente, { text: mensaje });
+                
+                // Mensaje adicional para pedir confirmación
+                const mensajeConfirmacion = `
+📝 *Para continuar con tu reserva:*
+
+✅ Escribe *"SÍ"* para confirmar estas fechas
+❌ Escribe *"NO"* para ingresar nuevas fechas
+
+💡 *¿Estás listo para continuar?*`;
+                
+                await bot.sendMessage(remitente, { text: mensajeConfirmacion.trim() });
                 // Guardar fechas temporalmente y esperar confirmación
                 await establecerEstado(remitente, ESTADOS_RESERVA.CONFIRMAR_FECHAS, {
                     fechaEntrada: entrada,
@@ -53,13 +64,16 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                 break;
             }
             case ESTADOS_RESERVA.CONFIRMAR_FECHAS: {
-                if (mensajeTexto.trim().toLowerCase() === 'sí' || mensajeTexto.trim().toLowerCase() === 'si') {
+                const respuesta = mensajeTexto.trim().toLowerCase();
+                if (respuesta === 'sí' || respuesta === 'si') {
                     // Continúa el flujo, no vuelve a preguntar fechas
                     await bot.sendMessage(remitente, { text: '✅ *¡Fechas confirmadas!*\n📝 *Por favor, dime tu nombre completo:*' });
                     await establecerEstado(remitente, ESTADOS_RESERVA.NOMBRE, datos);
-                } else {
-                    await bot.sendMessage(remitente, { text: '❌ Fechas no confirmadas. Por favor, ingresa nuevamente el rango de fechas.' });
+                } else if (respuesta === 'no') {
+                    await bot.sendMessage(remitente, { text: '🔄 *De acuerdo, volvamos a empezar.*\n\n📅 *Por favor, ingresa nuevamente las fechas de tu reserva.*\n\n💡 *Ejemplo:* 20/08/2025 al 25/08/2025' });
                     await establecerEstado(remitente, ESTADOS_RESERVA.FECHAS, {});
+                } else {
+                    await bot.sendMessage(remitente, { text: '❓ *No entendí tu respuesta.*\n\n✅ Escribe *"SÍ"* para confirmar las fechas\n❌ Escribe *"NO"* para cambiar las fechas' });
                 }
                 break;
             }

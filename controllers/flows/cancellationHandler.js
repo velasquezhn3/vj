@@ -9,9 +9,9 @@ async function handleCancelarCommand(bot, remitente, telefono) {
         return;
     }
 
-    const reservation = await alojamientosService.getReservationByPhoneAndStatus(telefono, 'comprobante_recibido');
+    const reservation = await alojamientosService.getReservationByPhoneAndStatus(telefono, 'pendiente');
     if (!reservation) {
-        await bot.sendMessage(remitente, { text: '❌ No se encontró reserva con comprobante para el teléfono ' + telefono });
+        await bot.sendMessage(remitente, { text: '❌ No se encontró reserva pendiente para el teléfono ' + telefono });
         return;
     }
 
