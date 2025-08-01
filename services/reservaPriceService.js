@@ -12,47 +12,41 @@ function calcularPrecioTotal(tipoCabaña, fechaEntradaStr, noches) {
   const [dia, mes, anio] = fechaEntradaStr.split('/');
   const fechaEntrada = new Date(anio, mes - 1, dia);
 
-  if (tipoCabaña === 'Cabaña Tortuga') {
+  // Usar tipo corto
+  if (tipoCabaña === 'tortuga') {
     // Precio fijo 1500 por noche
     return 1500 * noches;
   }
-
-  if (tipoCabaña === 'Cabaña Caracol') {
-    // Reglas para Caracol
+  if (tipoCabaña === 'delfin') {
+    // Reglas para Delfín (antes Caracol)
     if (noches === 1) {
-      // Una sola noche
       if (isFriday(fechaEntrada) || isSaturday(fechaEntrada)) {
         return 5000;
       } else {
         return 3000;
       }
     } else if (noches === 2) {
-      // Dos noches
       const diaEntrada = getDay(fechaEntrada); // 5 = viernes, 6 = sábado
       const diaSalida = getDay(addDays(fechaEntrada, 1));
       if (diaEntrada === 5 && diaSalida === 6) {
-        // Viernes y sábado
         return 7000;
       } else {
-        // Dos noches normales
         return 3000 * noches;
       }
     } else {
-      // Más de 2 noches, precio normal lunes a jueves
       let total = 0;
       for (let i = 0; i < noches; i++) {
         const diaReserva = getDay(addDays(fechaEntrada, i));
         if (diaReserva >= 1 && diaReserva <= 4) {
-          total += 3000; // Lunes a jueves
+          total += 3000;
         } else {
-          total += 5000; // Viernes o sábado noche extra
+          total += 5000;
         }
       }
       return total;
     }
   }
-
-  if (tipoCabaña === 'Cabaña Tiburón') {
+  if (tipoCabaña === 'tiburon') {
     // Reglas para Tiburón
     if (noches === 1) {
       if (isFriday(fechaEntrada) || isSaturday(fechaEntrada)) {
@@ -81,7 +75,6 @@ function calcularPrecioTotal(tipoCabaña, fechaEntradaStr, noches) {
       return total;
     }
   }
-
   // Si no coincide ningún tipo, retornar 0
   return 0;
 }

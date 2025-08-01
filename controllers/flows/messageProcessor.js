@@ -108,12 +108,24 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
         if (handler) {
             await handler();
         } else {
-            // Si el estado no es manejado, muestra advertencia y regresa al menú principal
-            logger.warn(`Estado no manejado: ${estado}`, { userId: remitente });
-            await bot.sendMessage(remitente, {
-                text: '⚠️ Estado no reconocido. Te regreso al menú principal.'
-            });
-            await establecerEstado(remitente, 'MENU_PRINCIPAL', {});
+            // Si el estado no es manejado, verificar si es un estado que debe preservarse
+            const estadosAPreservar = ['esperando_pago', 'ESPERANDO_PAGO', 'esperando_confirmacion', 'ESPERANDO_CONFIRMACION'];
+            
+            if (estadosAPreservar.includes(estadoActual.estado)) {
+                // Para estados críticos, solo dar una advertencia pero mantener el estado
+                logger.warn(`Mensaje no válido en estado crítico: ${estadoActual.estado}`, { userId: remitente });
+                await bot.sendMessage(remitente, {
+                    text: '⏳ Tu reserva está en proceso. Por favor espera la confirmación del administrador.'
+                });
+                return; // No cambiar el estado
+            } else {
+                // Si el estado no es manejado, muestra advertencia y regresa al menú principal
+                logger.warn(`Estado no manejado: ${estado}`, { userId: remitente });
+                await bot.sendMessage(remitente, {
+                    text: '⚠️ Estado no reconocido. Te regreso al menú principal.'
+                });
+                await establecerEstado(remitente, 'MENU_PRINCIPAL', {});
+            }
         }
     } catch (error) {
         logger.error(`Error procesando mensaje de ${remitente}: ${error.message}`, {
@@ -123,11 +135,22 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
         });
 
         try {
-            await bot.sendMessage(remitente, {
-                text: '⚠️ Error procesando tu solicitud. Intenta nuevamente.'
-            });
-            establecerEstado(remitente, 'MENU_PRINCIPAL');
-            await enviarMenuPrincipal(bot, remitente);
+            // Verificar si es un estado crítico que no debe resetearse
+            const estadoActual = obtenerEstado(remitente);
+            const estadosAPreservar = ['esperando_pago', 'ESPERANDO_PAGO', 'esperando_confirmacion', 'ESPERANDO_CONFIRMACION'];
+            
+            if (estadosAPreservar.includes(estadoActual.estado)) {
+                await bot.sendMessage(remitente, {
+                    text: '⚠️ Error temporal. Tu reserva sigue en proceso, no te preocupes.'
+                });
+                // No resetear el estado
+            } else {
+                await bot.sendMessage(remitente, {
+                    text: '⚠️ Error procesando tu solicitud. Intenta nuevamente.'
+                });
+                establecerEstado(remitente, 'MENU_PRINCIPAL');
+                await enviarMenuPrincipal(bot, remitente);
+            }
         } catch (fallbackError) {
             logger.critical(`Error crítico de comunicación: ${fallbackError.message}`, {
                 stack: fallbackError.stack,

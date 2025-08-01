@@ -18,9 +18,9 @@ const calcularDiferenciaDias = (entrada, salida) => {
 };
 
 const asignarAlojamiento = (personas) => {
-    if (personas <= 3) return 'Cabaña Tortuga';
-    if (personas <= 6) return 'Cabaña Caracol';
-    if (personas <= 9) return 'Cabaña Tiburón';
+    if (personas <= 3) return 'tortuga';
+    if (personas <= 6) return 'delfin';
+    if (personas <= 9) return 'tiburon';
     return null;
 };
 
@@ -78,28 +78,24 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
 
             case ESTADOS_RESERVA.PERSONAS: {
                 const cantidad = parseInt(mensajeTexto);
-                
                 if (isNaN(cantidad) || cantidad < 1) {
                     await bot.sendMessage(remitente, { text: '🔢 Por favor ingresa un *número válido* (ej: 4)' });
                     return;
                 }
-                
-                const alojamiento = asignarAlojamiento(cantidad);
-                
-                if (!alojamiento) {
+                const tipoCabana = asignarAlojamiento(cantidad);
+                if (!tipoCabana) {
                     await bot.sendMessage(remitente, {
                         text: `⚠️ *Capacidad excedida* (${cantidad} personas)\nSugerencia: Alquila múltiples cabañas`
                     });
                     return;
                 }
-                
                 await bot.sendMessage(remitente, {
-                    text: `🏠 *Asignado automáticamente:*\n*${alojamiento}* para ${cantidad} persona(s)`
+                    text: `🏠 *Asignado automáticamente:*
+*${tipoCabana}* para ${cantidad} persona(s)`
                 });
-                
                 try {
                     const precioTotal = calcularPrecioTotal(
-                        alojamiento, 
+                        tipoCabana, 
                         datos.fechaEntrada, 
                         datos.noches
                     );
@@ -107,14 +103,12 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                     await bot.sendMessage(remitente, { 
                         text: `💵 *Precio total:* $${precioTotal}\n\n📄 *¿Aceptas las condiciones de uso?* (responde *sí* o *no*)` 
                     });
-                    
                     await establecerEstado(remitente, ESTADOS_RESERVA.CONDICIONES, {
                         ...datos,
                         personas: cantidad,
-                        alojamiento,
+                        alojamiento: tipoCabana,
                         precioTotal
                     });
-                    
                 } catch (error) {
                     console.error('Error cálculo precio:', error);
                     await bot.sendMessage(remitente, { 
@@ -130,6 +124,48 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                 if (!aceptado) {
                     await bot.sendMessage(remitente, { 
                         text: '📝 Debes aceptar las condiciones para continuar\nResponde *"sí"* si estás de acuerdo' 
+                    });
+                    return;
+                }
+                
+                // ✅ VERIFICAR DISPONIBILIDAD ANTES DE ACEPTAR LA RESERVA
+                const { buscarCabanaDisponible } = require('../../services/cabinsService');
+                
+                try {
+                    // Convertir fechas al formato correcto para la búsqueda
+                    const fechaInicio = datos.fechaEntrada.split('/').reverse().join('-'); // DD/MM/YYYY -> YYYY-MM-DD
+                    const fechaFin = datos.fechaSalida.split('/').reverse().join('-');
+                    
+                    const cabanaDisponible = await buscarCabanaDisponible(
+                        datos.alojamiento, 
+                        fechaInicio, 
+                        fechaFin, 
+                        datos.personas
+                    );
+                    
+                    if (!cabanaDisponible) {
+                        // NO HAY DISPONIBILIDAD - Informar al cliente
+                        const tipoNombre = datos.alojamiento === 'tortuga' ? 'Tortuga' : 
+                                          datos.alojamiento === 'delfin' ? 'Delfín' : 'Tiburón';
+                        
+                        await bot.sendMessage(remitente, { 
+                            text: `❌ Lo sentimos, no hay cabañas tipo *${tipoNombre}* disponibles para las fechas *${datos.fechaEntrada} - ${datos.fechaSalida}*.\n\n` +
+                                  `📅 Por favor selecciona otras fechas o consulta disponibilidad de otros tipos de cabaña.\n\n` +
+                                  `Para empezar de nuevo, escribe *"hola"*.`
+                        });
+                        
+                        // Limpiar estado para que pueda empezar de nuevo
+                        await establecerEstado(remitente, null, {});
+                        return;
+                    }
+                    
+                    // HAY DISPONIBILIDAD - Continuar con la reserva
+                    console.log(`✅ Cabaña ${datos.alojamiento} disponible: ${cabanaDisponible.name}`);
+                    
+                } catch (error) {
+                    console.error('Error verificando disponibilidad:', error);
+                    await bot.sendMessage(remitente, { 
+                        text: '❌ Error verificando disponibilidad. Por favor intenta nuevamente.' 
                     });
                     return;
                 }

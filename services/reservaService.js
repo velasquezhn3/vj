@@ -29,8 +29,32 @@ async function createReservationWithUser(phoneNumber, reservaData, cabinId) {
     }
 
     if (!cabinId) {
-        return { success: false, error: 'ID de cabaña es requerido' };
+        // Buscar una cabaña disponible si no se pasa el ID
+        const { buscarCabanaDisponible } = require('./cabinsService');
+        // Asegurar tipo correcto
+        let tipo = reservaData.tipo || reservaData.alojamiento;
+        if (!tipo) {
+            tipo = 'tortuga'; // fallback por defecto
+        }
+        // Convertir fechas a YYYY-MM-DD si vienen en DD/MM/YYYY
+        function toISO(fecha) {
+            if (!fecha) return null;
+            if (fecha.includes('/')) {
+                const [d, m, y] = fecha.split('/');
+                return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+            }
+            return fecha;
+        }
+        const personas = reservaData.personas;
+        const start = toISO(reservaData.start_date);
+        const end = toISO(reservaData.end_date);
+        const cabinDisponible = await buscarCabanaDisponible(tipo, start, end, personas);
+        if (!cabinDisponible) {
+            return { success: false, error: 'No hay cabaña disponible para el tipo, fechas y cantidad de personas.' };
+        }
+        cabinId = cabinDisponible.cabin_id;
     }
+
 
     try {
         // Insert user if not exists (SQLite does not support INSERT IGNORE, use INSERT OR IGNORE)
@@ -45,7 +69,39 @@ async function createReservationWithUser(phoneNumber, reservaData, cabinId) {
         }
         const user_id = userRows[0].user_id;
 
-        // Insert reservation with cabinId
+
+        // Validar capacidad de la cabaña
+        const cabinRows = await runQuery('SELECT * FROM Cabins WHERE cabin_id = ?', [cabinId]);
+        if (!cabinRows || cabinRows.length === 0) {
+            return { success: false, error: 'No se encontró la cabaña seleccionada' };
+        }
+        const capacidad = cabinRows[0].capacity;
+        if (reservaData.personas > capacidad) {
+            return { success: false, error: `La cabaña seleccionada solo permite hasta ${capacidad} personas.` };
+        }
+
+        // Normalizar fechas antes de insertar
+        function normalizarFecha(fecha) {
+            if (!fecha) return null;
+            
+            // Si ya está en formato YYYY-MM-DD, devolverla tal como está
+            if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+                return fecha;
+            }
+            
+            // Si está en formato DD/MM/YYYY, convertir a YYYY-MM-DD
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(fecha)) {
+                const [dia, mes, año] = fecha.split('/');
+                return `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+            }
+            
+            return fecha; // Fallback
+        }
+
+        const startDateNormalizada = normalizarFecha(reservaData.start_date);
+        const endDateNormalizada = normalizarFecha(reservaData.end_date);
+
+        // Insert reservation solo con cabin_id real
         const insertReservaSql = `
             INSERT INTO Reservations (user_id, cabin_id, start_date, end_date, status, total_price, personas)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -53,8 +109,8 @@ async function createReservationWithUser(phoneNumber, reservaData, cabinId) {
         const insertResult = await runExecute(insertReservaSql, [
             user_id,
             cabinId,
-            reservaData.start_date,
-            reservaData.end_date,
+            startDateNormalizada,
+            endDateNormalizada,
             reservaData.status,
             reservaData.total_price,
             reservaData.personas || null
@@ -136,7 +192,7 @@ async function getReservationDetailsById(reservationId) {
             r.start_date AS fechaEntrada,
             r.end_date AS fechaSalida,
             r.cabin_id AS alojamiento,
-            c.capacity AS personas,
+            r.personas AS personas,
             r.status AS status
         FROM Reservations r
         JOIN Users u ON r.user_id = u.user_id
@@ -213,6 +269,27 @@ async function getReservationById(reservationId) {
     }
 }
 
+/**
+ * Find user by phone number
+ * @param {string} phoneNumber - phone number to search
+ * @returns {Promise<object|null>} user object or null if not found
+ */
+async function findUserByPhone(phoneNumber) {
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (!normalizedPhone) {
+        return null;
+    }
+
+    try {
+        const sql = `SELECT * FROM Users WHERE phone_number = ?`;
+        const rows = await runQuery(sql, [normalizedPhone]);
+        return rows.length > 0 ? rows[0] : null;
+    } catch (error) {
+        logger.error('Error finding user by phone:', error);
+        return null;
+    }
+}
+
 module.exports = {
     createReservationWithUser,
     normalizePhoneNumber,
@@ -222,5 +299,6 @@ module.exports = {
     upsertUser,
     updateReservationPrice,
     getUserByPhone,
-    getReservationById
+    getReservationById,
+    findUserByPhone
 };

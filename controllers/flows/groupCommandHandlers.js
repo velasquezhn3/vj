@@ -6,6 +6,7 @@ const { runQuery } = require('../../db');
 const { upsertUser, createReservationWithUser, normalizePhoneNumber, getUserByPhone, getReservationDetailsById } = require('../../services/reservaService');
 const { eliminarComprobante } = require('../../services/comprobanteService');
 const { obtenerEstado } = require('../../services/stateService');
+const { handleConfirmarCommand } = require('./reservationHandlers'); // Importar la función robusta
 const fs = require('fs');
 const path = require('path');
 
@@ -140,113 +141,6 @@ async function handleGroupCommand(bot, remitente, mensajeTexto, mensajeObj) {
     }
 }
 
-async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
-    try {
-        logger.info(`Comando /confirmar recibido con parámetro: ${param || 'ninguno'}`);
-
-        // Determine userId: if command comes from a group, extract from param cleaning suffix @s.whatsapp.net, else use param as is
-        let userId;
-        if (remitente.endsWith('@g.us')) {
-            userId = param ? param.replace(/@s\.whatsapp\.net$/, '') : undefined;
-        } else {
-            userId = param;
-        }
-
-        if (!userId) {
-            throw new Error('No se pudo determinar el número de teléfono del usuario');
-        }
-
-        // Normalize phone number before querying
-        userId = normalizePhoneNumber(userId);
-
-        // Fetch user state by userId (phone number) instead of remitente (group JID)
-        const latestState = obtenerEstado(userId + '@s.whatsapp.net');
-        const datos = latestState?.datos || {};
-        let userName = datos.nombre || null;
-        let totalPrice = datos.precioTotal || 0;
-        let fechaEntrada = datos.fechaEntrada || null;
-        let fechaSalida = datos.fechaSalida || null;
-        let alojamiento = datos.alojamiento || null;
-        let personas = datos.personas || null;
-
-        // Defensive: Ensure userName and totalPrice are valid
-        if (typeof userName !== 'string' || userName.trim() === '') {
-            userName = null;
-        }
-        if (typeof totalPrice !== 'number' || totalPrice < 0) {
-            totalPrice = 0;
-        }
-
-        // Save or update user name in DB
-        if (userName) {
-            const upsertResult = await upsertUser(userId, userName);
-            if (!upsertResult.success) {
-                throw new Error('Error al guardar el nombre de usuario');
-            }
-        }
-
-        // Removed existing reservation check to allow multiple reservations per user
-        // Always create a new reservation
-
-        // If no existing reservation, create new
-        const cabinsDataPath = path.join(__dirname, '../../data/cabañas.json');
-        const cabinsJson = fs.readFileSync(cabinsDataPath, 'utf-8');
-        const cabins = JSON.parse(cabinsJson);
-
-        // Find cabinId matching alojamiento name from datos
-        let cabinId = null;
-        if (alojamiento) {
-            const cabinMatch = cabins.find(c => c.nombre === alojamiento || c.name === alojamiento);
-            if (cabinMatch) {
-                cabinId = cabinMatch.id || cabinMatch.cabin_id;
-            }
-        }
-        if (!cabinId && cabins.length > 0) {
-            cabinId = cabins[0].id || cabins[0].cabin_id;
-        }
-
-        const reservaData = {
-            start_date: fechaEntrada || new Date().toISOString().split('T')[0],
-            end_date: fechaSalida || new Date().toISOString().split('T')[0],
-            status: 'pendiente',
-            total_price: totalPrice,
-            personas: personas
-        };
-
-        const result = await createReservationWithUser(userId, reservaData, cabinId);
-
-        if (!result.success) {
-            throw new Error(result.error || 'Error al guardar la reserva');
-        }
-
-        const reservationId = result.reservationId;
-
-        // Fetch reservation details after creation for verification
-        const reserva = await getReservationDetailsById(reservationId);
-
-        const userJid = `${normalizePhoneNumber(userId)}@s.whatsapp.net`;
-
-        await bot.sendMessage(GRUPO_JID, {
-            text: `✅ Reserva guardada exitosamente con estado pendiente para el teléfono ${normalizePhoneNumber(userId)}\nID de reserva: ${reservationId}\n`
-        }); 
-       
-        const depositInstructions = `Su reserva fue aprobada. Tiene 24 horas para enviar el comprobante de transferencia a los siguientes bancos:
-- Ficohsa
-- BAC
-- Occidente
-- Atlántida
-Puedes enviar la foto de la reserva en este chat o más adelante, seleccionando la opción 8: Ayuda post-reserva.`;
-
-        await bot.sendMessage(userJid, { text: depositInstructions });
-
-        await bot.sendMessage(remitente, { text: 'Mensaje de prueba para verificar conectividad.' });
-
-    } catch (error) {
-        logger.error(`Error en handleConfirmarCommand: ${error.message}`, { error });
-        await bot.sendMessage(remitente, { text: '⚠️ Error procesando la reserva. Por favor intenta nuevamente.' });
-    }
-}
-
 async function handleCancelarCommand(bot, remitente, telefono) {
     if (!telefono) {
         await bot.sendMessage(remitente, { text: '❌ Por favor proporciona un número de teléfono. Uso: /cancelar [telefono]' });
@@ -333,7 +227,6 @@ Una vez realizado el depósito, envía el comprobante aquí.`;
 
 module.exports = {
     handleGroupCommand,
-    handleConfirmarCommand,
     handleReservadoCommand,
     handleCancelarCommand,
     handleConfirmadoCommand,
