@@ -67,7 +67,7 @@ async function solucionInmediata() {
         console.log(`   - Cabaña: ${cabina.name}`);
         console.log(`   - Fechas: ${fechaInicio} - ${fechaFin}`);
         console.log(`   - Personas: ${personas}`);
-        console.log(`   - Precio: $10,500`);
+        console.log(`   - Precio: Lmps. 10,500`);
         console.log(`   - Estado: pendiente`);
         
         console.log('\n🔔 La reserva está lista y guardada en la base de datos.');

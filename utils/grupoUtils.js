@@ -14,7 +14,7 @@ async function enviarReservaAlGrupo(bot, reserva) {
 "📅 Fechas: " + (reserva.fechaEntrada ? reserva.fechaEntrada : 'N/A') + " → " + (reserva.fechaSalida ? reserva.fechaSalida : 'N/A') + "\n" +
 "👥 Personas: " + (reserva.personas || 'N/A') + "\n" +
 "🏠 Alojamiento: " + (reserva.alojamiento || 'N/A') + "\n" +
-"💵 Total: $" + (reserva.precioTotal || 0) + "\n" +
+"💵 Total: Lmps. " + (reserva.precioTotal || 0) + "\n" +
 "--------------------------------------\n" +
 "✅ Usa /reservado " + reserva.reservation_id + " para confirmar\n" +
 "❌ Usa /cancelar " + reserva.reservation_id + " para rechazar\n";

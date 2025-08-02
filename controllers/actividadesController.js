@@ -7,8 +7,8 @@ const generateActivityDetails = (actividad) => {
   detalles += `📍 Ubicación: ${actividad.ubicacion.direccion}\n`;
   detalles += `⏰ Duración: ${actividad.duracion}\n`;
   
-  detalles += `💰 Precio adulto: ${actividad.precios?.adulto ?? 'N/A'} ${actividad.precios?.moneda || 'HNL'}\n`;
-  detalles += `💰 Precio niño: ${actividad.precios?.nino ?? 'N/A'} ${actividad.precios?.moneda || 'HNL'}\n`;
+  detalles += `💰 Precio adulto: Lmps. ${actividad.precios?.adulto ?? 'N/A'}\n`;
+  detalles += `💰 Precio niño: Lmps. ${actividad.precios?.nino ?? 'N/A'}\n`;
   
   detalles += `📅 Horarios: ${actividad.horarios.general}\n`;
   detalles += `📝 Descripción: ${actividad.descripcionCorta || actividad.descripcion}\n\n`;

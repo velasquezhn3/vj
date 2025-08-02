@@ -2,7 +2,7 @@
  * Archivo para constantes y textos de menú usados en el bot.
  */
 
-const MENU_PRINCIPAL = `🏡 *Bienvenido a Villas julie* 🌟\n
+const MENU_PRINCIPAL = `🏡 *Bienvenido a Villas Julie* 🌟\n
 1. 🌄 Ver Alojamientos Disponibles
 2. 📅 Reservar Ahora
 3. 🌟 Experiencias Locales

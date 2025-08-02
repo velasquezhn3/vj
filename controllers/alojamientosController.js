@@ -6,7 +6,7 @@ const generateCabinDetails = (cabaña) => {
   let detalles = `🏖️ *${cabaña.nombre}* (${cabaña.tipo})\n`;
   detalles += `👥 Capacidad: ${cabaña.capacidad} personas\n`;
   detalles += `🛏️ Habitaciones: ${cabaña.habitaciones} | 🚿 Baños: ${cabaña.baños}\n`;
-  detalles += `💰 Precio por noche: ${cabaña.precio_noche.toLocaleString()} ${cabaña.moneda}\n`;
+  detalles += `💰 Precio por noche: Lmps. ${cabaña.precio_noche.toLocaleString()}\n`;
   detalles += `📍 Ubicación: ${cabaña.ubicacion.ciudad}, ${cabaña.ubicacion.departamento}\n\n`;
   
   detalles += `🛋️ Comodidades:\n`;

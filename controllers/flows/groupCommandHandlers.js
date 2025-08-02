@@ -22,7 +22,7 @@ async function enviarReservaAlGrupo(bot, reserva) {
 📅 Fechas: ${reserva.fechaEntrada || reserva.start_date} → ${reserva.fechaSalida || reserva.end_date}
 👥 Personas: ${reserva.personas}
 🏠 Alojamiento: ${reserva.alojamiento || (reserva.alojamiento && reserva.alojamiento.nombre) || 'N/A'}
-💵 Total: $${reserva.precioTotal || reserva.total_price}
+💵 Total: Lmps. ${reserva.precioTotal || reserva.total_price}
 --------------------------------------
 ✅ Usa /reservado ${reserva.reservation_id || reserva._id} para confirmar
 ❌ Usa /cancelar ${reserva.reservation_id || reserva._id} para rechazar
@@ -89,7 +89,7 @@ Gracias por confiar en nosotros. 🎉 *¡Tu reserva ha sido confirmada con éxit
    - 🗓️ Fechas: Del ${reserva.fechaEntrada || reserva.start_date} al ${reserva.fechaSalida || reserva.end_date}
    - 👥 Personas: ${reserva.personas} ${reserva.personas > 1 ? 'huéspedes' : 'huésped'}
    - 🏡 Alojamiento: ${reserva.alojamiento || 'Se asignará próximamente'}
-   - 💰 Precio total: $${reserva.precioTotal || reserva.total_price}
+   - 💰 Precio total: Lmps. ${reserva.precioTotal || reserva.total_price}
    - 🔑 Código de reserva: ${param}
 
 💼 *Tu itinerario:*

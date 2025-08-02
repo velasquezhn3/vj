@@ -74,8 +74,8 @@ function formatActivityDetails(actividad) {
   // Precios/Menú
   if (actividad.precios) {
     sections.push('💰 *Precios:*');
-    sections.push(`Adulto: ${safeValue(actividad.precios.adulto)} ${safeValue(actividad.precios.moneda)}`);
-    sections.push(`Niño: ${safeValue(actividad.precios.nino)} ${safeValue(actividad.precios.moneda)}`);
+    sections.push(`Adulto: Lmps. ${safeValue(actividad.precios.adulto)}`);
+    sections.push(`Niño: Lmps. ${safeValue(actividad.precios.nino)}`);
     sections.push(`Descuento grupo: ${safeValue(actividad.precios.descuentoGrupo)}% para mínimo ${safeValue(actividad.precios.grupoMinimo)} personas`);
     sections.push(`Incluye: ${safeValue(actividad.precios.incluye)}\n`);
   } else if (actividad.menu) {

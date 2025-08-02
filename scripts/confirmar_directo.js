@@ -75,7 +75,7 @@ async function confirmarReservaDirecta(userId) {
             console.log(`   - Cabaña: ${cabina.name}`);
             console.log(`   - Fechas: ${fechaInicio} - ${fechaFin}`);
             console.log(`   - Personas: ${datos.personas}`);
-            console.log(`   - Precio: $${datos.precioTotal}`);
+            console.log(`   - Precio: Lmps. ${datos.precioTotal}`);
             
             return {
                 success: true,

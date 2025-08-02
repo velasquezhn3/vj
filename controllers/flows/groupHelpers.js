@@ -11,7 +11,7 @@ const RESERVATION_MESSAGES = {
   DATES: (start, end) => `📅 Fechas: ${start} → ${end}`,
   GUESTS: guests => `👥 Personas: ${guests}`,
   ACCOMMODATION: acc => `🏠 Alojamiento: ${acc || 'N/A'}`,
-  TOTAL: amount => `💵 Total: $${amount}`,
+  TOTAL: amount => `💵 Total: Lmps. ${amount}`,
   ACTIONS: id => `✅ Usa /reservado ${id} para confirmar\n❌ Usa /cancelar ${id} para rechazar`
 };
 

@@ -53,7 +53,7 @@ function generateConfirmationMessage(reserva, reservationId) {
     `   - 🗓️ Fechas: Del ${reserva.fechaEntrada || reserva.start_date} al ${reserva.fechaSalida || reserva.end_date}\n` +
     `   - 👥 Personas: ${reserva.personas} ${reserva.personas > 1 ? 'huéspedes' : 'huésped'}\n` +
     `   - 🏡 Alojamiento: ${reserva.alojamiento || 'Se asignará próximamente'}\n` +
-    `   - 💰 Precio total: $${reserva.precioTotal || reserva.total_price}\n` +
+    `   - 💰 Precio total: Lmps. ${reserva.precioTotal || reserva.total_price}\n` +
     `   - 🔑 Código de reserva: ${reservationId}\n\n` +
     `💼 *Tu itinerario:*\n` +
     `   • Día de llegada: Recepción a partir de las 02:00 PM\n` +
@@ -74,7 +74,7 @@ function generateConfirmationMessage(reserva, reservationId) {
 function generateDepositInstructions(reservation) {
   const depositAmount = Math.ceil(reservation.total * 0.5);
   return `Hola ${reservation.nombre}, tu reserva #${reservation.reservation_id} ha sido guardada con estado pendiente.\n` +
-    `⚠️ Tienes 24 horas para depositar el 50% ($${depositAmount}).\n` +
+    `⚠️ Tienes 24 horas para depositar el 50% (Lmps. ${depositAmount}).\n` +
     `Por favor realiza el depósito a la siguiente cuenta:\n` +
     `Banco: Banco Ejemplo\n` +
     `Número de cuenta: 123456789\n` +
@@ -334,16 +334,29 @@ async function handleConfirmarCommandRobust(bot, remitente, param, mensajeObj) {
       userName, totalPrice, fechaEntrada, fechaSalida, noches, personas, tipoCabana
     });
 
+    // Buscar usuario en BD para obtener nombre si no está en el estado
+    const { findUserByPhone } = require('../../services/reservaService');
+    let user = await findUserByPhone(userId);
+    
+    // Usar el mejor nombre disponible
+    if (!userName && user?.name) {
+      userName = user.name;
+    }
+    
+    // Si aún no hay nombre, usar un valor por defecto descriptivo
+    if (!userName) {
+      userName = 'Estimado Cliente';
+    }
+    
+    console.log('🔍 [DEBUG] Usuario encontrado:', user);
+    console.log('🔍 [DEBUG] Nombre final a usar:', userName);
+
     // Validaciones básicas
     if (!fechaEntrada || !fechaSalida || !tipoCabana) {
       logger.warn('🛡️ [CONFIRMAR ROBUSTO] Datos incompletos, activando failsafe');
       throw new Error('Datos de reserva incompletos');
     }
 
-    // Buscar usuario en BD
-    const { findUserByPhone } = require('../../services/reservaService');
-    let user = await findUserByPhone(userId);
-    
     console.log('🔍 [DEBUG] Usuario encontrado:', user);
     
     if (!user && userName) {
@@ -431,11 +444,70 @@ async function handleConfirmarCommandRobust(bot, remitente, param, mensajeObj) {
 📅 Salida: ${fechaSalidaFormateada}
 🌙 Noches: ${noches}
 👥 Huéspedes: ${personas}
-💰 Total: $${totalPrice.toLocaleString()}
+💰 Total: Lmps. ${totalPrice.toLocaleString()}
 
-🎉 ¡Nos vemos pronto en Villa Jardin!`;
+¡Muchas gracias por elegirnos! 🙏
+
+🎉 ¡Nos vemos pronto en Villas Julie!`;
 
     await safeSend(bot, remitente, mensaje);
+    
+    // Enviar mensaje de confirmación con datos bancarios al usuario privado
+    const userJid = userId + '@s.whatsapp.net';
+    const mensajeConfirmacion = `
+🎉 *¡FELICIDADES! Tu reserva ha sido APROBADA con éxito* 🎉
+
+🌟 Estimado/a ${userName}, 
+
+¡Gracias por confiar en nosotros! Tu reserva ha sido procesada exitosamente y está ahora CONFIRMADA.
+
+⏰ *IMPORTANTE - PLAZO DE PAGO:*
+Tienes *24 HORAS* para realizar el depósito del *50%* del total de tu reserva para asegurar tu estadía.
+
+💳 *DATOS BANCARIOS PARA DEPÓSITO:*
+
+🏦 *BANCO ATLÁNTIDA*
+   📱 Número de cuenta: 1234567890
+   💳 Tipo: Cuenta de Ahorros
+   👤 A nombre de: Villas Julie S.A.
+   🆔 RTN: 08011998765432
+
+🏦 *BAC HONDURAS*
+   📱 Número de cuenta: 0987654321
+   💳 Tipo: Cuenta Corriente  
+   👤 A nombre de: Villas Julie S.A.
+   🆔 RTN: 08011998765432
+
+🏦 *BANCO OCCIDENTE*
+   📱 Número de cuenta: 5566778899
+   💳 Tipo: Cuenta de Ahorros
+   👤 A nombre de: Villas Julie S.A.
+   🆔 RTN: 08011998765432
+
+📋 *INSTRUCCIONES DE PAGO:*
+1️⃣ Realiza la transferencia por el 50% del monto total
+2️⃣ Envía el comprobante de pago a este número
+3️⃣ Confirmaremos tu pago en un máximo de 2 horas
+
+⚠️ *NOTA IMPORTANTE:*
+Si no se recibe el depósito en las próximas 24 horas, la reserva será cancelada automáticamente.
+
+📞 *¿Tienes dudas?*
+Contáctanos al: 📱 +504 9990-5880
+
+¡Estamos emocionados de recibirte pronto! 🏨✨
+
+Con cariño,
+El Equipo de Reservas Vj 💚
+`;
+    
+    try {
+      await bot.sendMessage(userJid, { text: mensajeConfirmacion.trim() });
+      logger.info(`✅ Mensaje de confirmación enviado al usuario ${userId}`);
+    } catch (msgError) {
+      logger.error('❌ Error enviando mensaje de confirmación:', msgError);
+    }
+    
     logger.info('✅ [CONFIRMAR ROBUSTO] Reserva confirmada exitosamente');
     
   } catch (error) {
@@ -450,15 +522,22 @@ async function handleConfirmarCommandRobust(bot, remitente, param, mensajeObj) {
         
         await safeSend(bot, remitente, '🛡️ Procesando con sistema de emergencia...');
         
-        // Buscar usuario en BD
-        const { findUserByPhone } = require('../../services/reservaService');
-        const user = await findUserByPhone(userId);
-        const userName = user ? user.name : 'Usuario';
-        
-        // Intentar obtener datos del estado
+        // Intentar obtener datos del estado primero
         const userJid = userId + '@s.whatsapp.net';
         const state = obtenerEstado(userJid);
         const datosReales = state?.datos || null;
+        
+        // Buscar usuario en BD
+        const { findUserByPhone } = require('../../services/reservaService');
+        const user = await findUserByPhone(userId);
+        
+        // Obtener el nombre de la mejor fuente disponible
+        let userName = 'Estimado Cliente';
+        if (datosReales?.nombre) {
+          userName = datosReales.nombre;
+        } else if (user?.name) {
+          userName = user.name;
+        }
         
         // Crear reserva directa con datos reales si están disponibles
         await crearReservaDirectaRobusta(bot, remitente, userId, userName, datosReales);
@@ -481,19 +560,19 @@ Tienes *24 HORAS* para realizar el depósito del *50%* del total de tu reserva p
 🏦 *BANCO ATLÁNTIDA*
    📱 Número de cuenta: 1234567890
    💳 Tipo: Cuenta de Ahorros
-   👤 A nombre de: Villa Jardines S.A.
+   👤 A nombre de: Villas Julie S.A.
    🆔 RTN: 08011998765432
 
 🏦 *BAC HONDURAS*
    📱 Número de cuenta: 0987654321
    💳 Tipo: Cuenta Corriente  
-   👤 A nombre de: Villa Jardines S.A.
+   👤 A nombre de: Villas Julie S.A.
    🆔 RTN: 08011998765432
 
 🏦 *BANCO OCCIDENTE*
    📱 Número de cuenta: 5566778899
    💳 Tipo: Cuenta de Ahorros
-   👤 A nombre de: Villa Jardines S.A.
+   👤 A nombre de: Villas Julie S.A.
    🆔 RTN: 08011998765432
 
 📋 *INSTRUCCIONES DE PAGO:*
@@ -627,7 +706,7 @@ async function crearReservaDirectaRobusta(bot, remitente, userId, userName, dato
                      `🏠 ${cabina.name}\n` +
                      `📅 ${fechaInicio} - ${fechaFin}\n` +
                      `👥 ${personas} personas\n` +
-                     `💰 $${precioTotal.toLocaleString()}\n\n` +
+                     `💰 Lmps. ${precioTotal.toLocaleString()}\n\n` +
                      `*Instrucciones de pago:*\n` +
                      `Tienes 24h para enviar comprobante`;
       

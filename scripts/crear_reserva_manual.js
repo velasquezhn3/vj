@@ -18,7 +18,7 @@ async function crearReservaManual() {
     console.log(`- Fechas: ${fechaEntrada} - ${fechaSalida}`);
     console.log(`- Personas: ${personas}`);
     console.log(`- Cabaña ID: ${cabinId}`);
-    console.log(`- Precio: $${precioTotal}`);
+    console.log(`- Precio: Lmps. ${precioTotal}`);
     
     const reservaData = {
         start_date: fechaEntrada,
@@ -45,7 +45,7 @@ async function crearReservaManual() {
                 console.log(`   - Cabaña ID: ${reserva[0].cabin_id}`);
                 console.log(`   - Fechas: ${reserva[0].start_date} - ${reserva[0].end_date}`);
                 console.log(`   - Personas: ${reserva[0].personas}`);
-                console.log(`   - Precio: $${reserva[0].total_price}`);
+                console.log(`   - Precio: Lmps. ${reserva[0].total_price}`);
                 console.log(`   - Estado: ${reserva[0].status}`);
             }
             

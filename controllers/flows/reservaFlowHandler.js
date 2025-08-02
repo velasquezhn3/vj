@@ -24,6 +24,23 @@ const asignarAlojamiento = (personas) => {
     return null;
 };
 
+const formatearFechaCompleta = (fechaStr) => {
+    // Convierte fecha DD/MM/YYYY a formato legible
+    const [dia, mes, año] = fechaStr.split('/');
+    const fecha = new Date(año, mes - 1, dia);
+    
+    const diasSemana = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    
+    const diaSemana = diasSemana[fecha.getDay()];
+    const diaNum = fecha.getDate();
+    const mesNombre = meses[fecha.getMonth()];
+    const añoNum = fecha.getFullYear();
+    
+    return `${diaSemana} ${diaNum} de ${mesNombre} de ${añoNum}`;
+};
+
 async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje) {
     try {
         console.log(`[TRACE] handleReservaState called with estado=${estado}, datos=`, datos);
@@ -114,9 +131,31 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                         datos.noches
                     );
                     console.log(`[TRACE] Calculated precioTotal=${precioTotal}`);
+                    
+                    // Formatear fechas para mejor presentación
+                    const fechaEntradaFormatted = formatearFechaCompleta(datos.fechaEntrada);
+                    const fechaSalidaFormatted = formatearFechaCompleta(datos.fechaSalida);
+                    
+                    // Resumen completo de la reserva
+                    const resumenReserva = `📋 *RESUMEN DE TU RESERVA*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👤 *Nombre:* ${datos.nombre}
+📞 *Teléfono:* ${datos.telefono}
+📅 *Fechas:* ${fechaEntradaFormatted} hasta ${fechaSalidaFormatted}
+🌙 *Noches:* ${datos.noches}
+� *Personas:* ${cantidad}
+🏠 *Alojamiento:* ${tipoCabana.toUpperCase()}
+💵 *Total:* Lmps. ${precioTotal.toLocaleString()}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📄 *¿Aceptas las condiciones de uso?* (responde *sí* o *no*)`;
+
                     await bot.sendMessage(remitente, { 
-                        text: `💵 *Precio total:* $${precioTotal}\n\n📄 *¿Aceptas las condiciones de uso?* (responde *sí* o *no*)` 
+                        text: resumenReserva
                     });
+                    
                     await establecerEstado(remitente, ESTADOS_RESERVA.CONDICIONES, {
                         ...datos,
                         personas: cantidad,
@@ -184,7 +223,7 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                     return;
                 }
                 
-                const resumen = `\n📋 *NUEVA SOLICITUD DE RESERVA*\n--------------------------------\n• 👤 *Nombre:* ${datos.nombre}\n• 📱 *Teléfono:* ${datos.telefono}\n• 👥 *Personas:* ${datos.personas}\n• 🏠 *Alojamiento:* ${datos.alojamiento}\n• 📅 *Fechas:* ${datos.fechaEntrada} - ${datos.fechaSalida} (${datos.noches} noches)\n• 💰 *Total:* $${datos.precioTotal}\n--------------------------------\n                `;
+                const resumen = `\n📋 *NUEVA SOLICITUD DE RESERVA*\n--------------------------------\n• 👤 *Nombre:* ${datos.nombre}\n• 📱 *Teléfono:* ${datos.telefono}\n• 👥 *Personas:* ${datos.personas}\n• 🏠 *Alojamiento:* ${datos.alojamiento}\n• 📅 *Fechas:* ${datos.fechaEntrada} - ${datos.fechaSalida} (${datos.noches} noches)\n• 💰 *Total:* Lmps. ${datos.precioTotal}\n--------------------------------\n                `;
                 
                 await enviarAlGrupo(bot, resumen);
                 await enviarAlGrupo(bot, `/confirmar ${datos.telefono}`);

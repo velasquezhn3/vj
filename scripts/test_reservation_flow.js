@@ -57,7 +57,7 @@ async function testFlow() {
                     console.log(`      - Cabaña: ${reservaCreada[0].cabin_id}`);
                     console.log(`      - Fechas: ${reservaCreada[0].start_date} - ${reservaCreada[0].end_date}`);
                     console.log(`      - Personas: ${reservaCreada[0].personas}`);
-                    console.log(`      - Precio: $${reservaCreada[0].total_price}`);
+                    console.log(`      - Precio: Lmps. ${reservaCreada[0].total_price}`);
                     console.log(`      - Estado: ${reservaCreada[0].status}`);
                 }
             } else {

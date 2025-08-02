@@ -22,7 +22,20 @@ async function buscarCabanaDisponible(tipo, fechaInicio, fechaFin, personas) {
     const fechaFinISO = toISO(fechaFin);
     console.log(`[DEBUG][buscarCabanaDisponible] Fechas convertidas: ${fechaInicioISO} - ${fechaFinISO}`);
     // 1. Obtener todas las cabañas físicas del tipo
-    const cabins = await runQuery('SELECT * FROM Cabins WHERE type = ? AND capacity >= ?', [tipo, personas]);
+    // Como no tenemos columna 'type', buscamos por patrón en el nombre
+    const tipoNombre = {
+        'tortuga': 'Tortuga',
+        'delfin': 'Delfín', 
+        'tiburon': 'Tiburón'
+    };
+    
+    const nombreTipo = tipoNombre[tipo.toLowerCase()];
+    if (!nombreTipo) {
+        console.log(`[DEBUG][buscarCabanaDisponible] Tipo no válido: ${tipo}`);
+        return null;
+    }
+    
+    const cabins = await runQuery('SELECT * FROM Cabins WHERE name LIKE ? AND capacity >= ?', [`%${nombreTipo}%`, personas]);
     console.log(`[DEBUG][buscarCabanaDisponible] Cabañas encontradas: ${cabins.length}`);
     if (!cabins || cabins.length === 0) {
         console.log('[DEBUG][buscarCabanaDisponible] No hay cabañas del tipo y capacidad suficiente');
