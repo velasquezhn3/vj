@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "validate": "node scripts/validate_cabin_data.js",
+    "sync": "node scripts/sync_cabin_data.js",
+    "sync-json-to-db": "node scripts/sync_cabin_data.js --json-to-db",
+    "sync-db-to-json": "node scripts/sync_cabin_data.js --db-to-json",
+    "full-check": "npm run validate && npm run sync"
+  },
+  "maintenance": {
+    "daily": ["validate"],
+    "weekly": ["sync", "validate"],
+    "before_deployment": ["full-check"]
+  }
+}

@@ -1,24 +1,57 @@
 const path = require('path');
 const logger = require('../config/logger');
 const { runQuery } = require('../db');
+const cabinsDataService = require('./cabinsDataService');
 
 async function cargarCabanas() {
     try {
-        const cabanasPath = path.resolve(__dirname, '../data/cabañas.json');
-        delete require.cache[require.resolve(cabanasPath)];
-        const data = require(cabanasPath);
+        // Usar el nuevo servicio de datos de cabañas
+        const cabanas = await cabinsDataService.getAllCabins();
         
-        if (!Array.isArray(data)) {
-            throw new Error('Formato inválido de cabañas: no es un array');
-        }
+        // Convertir al formato esperado por el código existente
+        const cabanasFormateadas = cabanas.map(cabin => ({
+            nombre: cabin.name,
+            name: cabin.name,
+            capacidad: cabin.capacity,
+            capacity: cabin.capacity,
+            descripcion: cabin.description,
+            description: cabin.description,
+            precio: cabin.basePrice,
+            basePrice: cabin.basePrice,
+            precioPersonaAdicional: cabin.pricePerAdditionalPerson,
+            pricePerAdditionalPerson: cabin.pricePerAdditionalPerson,
+            fotos: cabin.photos,
+            photos: cabin.photos,
+            activa: cabin.isActive,
+            isActive: cabin.isActive,
+            id: cabin.id,
+            cabinId: cabin.cabinId || cabin.id
+        }));
         
-        return data;
+        logger.debug(`Cargadas ${cabanasFormateadas.length} cabañas desde BD`);
+        return cabanasFormateadas;
+        
     } catch (error) {
         logger.error(`Error cargando cabañas: ${error.message}`, {
             stack: error.stack,
             module: 'cargarCabanas'
         });
-        throw new Error('Error al cargar información de cabañas');
+        
+        // Fallback: intentar cargar desde JSON como último recurso
+        try {
+            logger.warn('Intentando fallback desde archivo JSON...');
+            const cabanasPath = path.resolve(__dirname, '../data/cabañas.json');
+            delete require.cache[require.resolve(cabanasPath)];
+            const data = require(cabanasPath);
+            
+            if (!Array.isArray(data)) {
+                return Object.values(data);
+            }
+            return data;
+        } catch (fallbackError) {
+            logger.error('Fallback JSON también falló:', fallbackError);
+            throw new Error('Error al cargar información de cabañas');
+        }
     }
 }
 

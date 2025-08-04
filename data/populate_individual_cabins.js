@@ -14,7 +14,7 @@ const individualCabins = [
   { name: 'Cabaña Delfín 1', type: 'delfin', capacity: 6, description: 'Cabaña amplia de 2 cuartos y 2 baños para máximo 6 personas', price: 4500 },
   { name: 'Cabaña Delfín 2', type: 'delfin', capacity: 6, description: 'Cabaña amplia de 2 cuartos y 2 baños para máximo 6 personas', price: 4500 },
   
-  // 8 Cabañas Tiburón (9 personas) - pero el usuario dice 8 tortugas, asumo que se refiere a otro tipo
+  // 8 Cabañas Tiburón (9 personas)
   { name: 'Cabaña Tiburón 1', type: 'tiburon', capacity: 9, description: 'Cabaña grande de 3 cuartos y 3 baños para máximo 9 personas', price: 6000 },
   { name: 'Cabaña Tiburón 2', type: 'tiburon', capacity: 9, description: 'Cabaña grande de 3 cuartos y 3 baños para máximo 9 personas', price: 6000 },
   { name: 'Cabaña Tiburón 3', type: 'tiburon', capacity: 9, description: 'Cabaña grande de 3 cuartos y 3 baños para máximo 9 personas', price: 6000 },

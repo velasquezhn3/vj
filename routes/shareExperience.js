@@ -9,11 +9,11 @@ const { establecerEstado } = require('../services/stateService');
 async function sendShareExperienceInstructions(bot, remitente, establecerEstadoFunc) {
   try {
     await bot.sendMessage(remitente, {
-      text: `📸 ¡Gana $20 de descuento en tu próxima reserva!\n\n` +
+      text: `📸 ¡Gana L 500 de descuento en tu próxima reserva!\n\n` +
             `1. Sube una foto a *Instagram* o *Facebook*\n` +
             `2. Etiqueta 👉 @villasjulie\n` +
             `3. Envíanos el enlace aquí ⬇️\n\n` +
-            `Participa para ganarte $20 de descuento, 4 ganadores al año.\n\n` +
+            `Participa para ganarte L 500 de descuento, 4 ganadores al año.\n\n` +
             `Por favor, envía el enlace de tu publicación de Instagram (debe ser un enlace tipo instagram.com/p/...)` +
             `\n\nEscribe "menu" para ir al menú principal.`
     });
@@ -36,10 +36,10 @@ async function handleShareExperienceResponse(bot, remitente, mensaje, establecer
   if (instagramPostPattern.test(instagramLink)) {
     try {
       await bot.sendMessage(remitente, {
-        text: '¡Gracias por compartir tu experiencia! 🎉 Estas Participando en un descuento de $20 en tu próxima reserva.' +
+        text: '¡Gracias por compartir tu experiencia! 🎉 Estás participando en un descuento de L 500 en tu próxima reserva.' +
               `\n\nEscribe "menu" para ir al menú principal.`
       });
-      await establecerEstadoFunc(remitente, 'main');
+      await establecerEstadoFunc(remitente, null); // Limpiar estado
     } catch (error) {
       console.error('Error enviando confirmación de descuento:', error);
     }

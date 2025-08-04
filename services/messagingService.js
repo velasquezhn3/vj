@@ -1,7 +1,7 @@
 const logger = require('../config/logger');
 const constants = require('../controllers/constants');
 const { establecerEstado } = require('./stateService');
-const { cargarCabanas } = require('./cabanasService');
+const { loadMenuCabinTypes } = require('./menuCabinTypesService');
 const { isValidUrl } = require('../utils/utils');
 
 async function enviarMenuPrincipal(bot, remitente) {
@@ -35,9 +35,9 @@ async function enviarMenuPrincipal(bot, remitente) {
 
 async function enviarMenuCabanas(bot, remitente) {
     try {
-        const cabanas = await cargarCabanas();
+        const tipos = await loadMenuCabinTypes();
         
-        if (cabanas.length === 0) {
+        if (tipos.length === 0) {
             await bot.sendMessage(remitente, { text: constants.ERROR_NO_CABANAS });
             await enviarMenuPrincipal(bot, remitente);
             return;
@@ -45,12 +45,12 @@ async function enviarMenuCabanas(bot, remitente) {
         
         await establecerEstado(remitente, 'LISTA_CABAÑAS');
         
-        const menuCabanas = `🌴 Cabañas Disponibles:\n` +
-            cabanas.map((cabaña, index) => `${index + 1}. ${cabaña.nombre || 'Cabaña sin nombre'}`).join('\n') +
-            `\n0. Volver ↩️\nPor favor, selecciona el número de la cabaña para ver más detalles.`;
+        const menuCabanas = `�️ Villas Julie - Opciones de Alojamiento\n\n` +
+            tipos.map((tipo, index) => `${index + 1}. ${tipo.nombre}`).join('\n') +
+            `\n\n0. Volver ↩️\nPor favor selecciona el número de la opción que te interesa:`;
         
         await bot.sendMessage(remitente, { text: menuCabanas });
-        logger.info(`Menú cabañas enviado a ${remitente}`);
+        logger.info(`Menú tipos de cabañas enviado a ${remitente} - ${tipos.length} opciones`);
         
     } catch (error) {
         logger.error(`Error enviando menú de cabañas a ${remitente}: ${error.message}`, {
@@ -73,32 +73,37 @@ async function enviarMenuCabanas(bot, remitente) {
 
 async function enviarDetalleCabaña(bot, remitente, seleccion) {
     try {
-        const cabanas = await cargarCabanas();
+        const tipos = await loadMenuCabinTypes();
         
         const seleccionNum = parseInt(seleccion);
-        if (isNaN(seleccionNum) || seleccionNum < 1 || seleccionNum > cabanas.length) {
+        if (isNaN(seleccionNum) || seleccionNum < 1 || seleccionNum > tipos.length) {
             await bot.sendMessage(remitente, { text: constants.ERROR_SELECCION_INVALIDA });
             await enviarMenuCabanas(bot, remitente);
             return;
         }
         
-        const cabaña = cabanas[seleccionNum - 1];
-        if (!cabaña || typeof cabaña !== 'object') {
-            throw new Error('Cabaña seleccionada no válida');
+        const tipo = tipos[seleccionNum - 1];
+        if (!tipo || typeof tipo !== 'object') {
+            throw new Error('Tipo de cabaña seleccionado no válido');
         }
         
         await establecerEstado(remitente, 'DETALLE_CABAÑA', { seleccion: seleccionNum });
         
-        const nombre = cabaña.nombre || 'Cabaña sin nombre';
-        const tipo = cabaña.tipo || 'Tipo no especificado';
-        const descripcion = cabaña.descripcion || 'Descripción no disponible';
+        const nombre = tipo.nombre || 'Cabaña sin nombre';
+        const tipoDesc = tipo.tipo || 'Tipo no especificado';
+        const descripcion = tipo.descripcion || 'Descripción no disponible';
+        const precio = tipo.precio_noche ? `HNL ${tipo.precio_noche.toLocaleString()}` : 'Precio no disponible';
         
-        let detalles = `🏖️ *${nombre}* (${tipo})\n\n${descripcion}\n\n` +
+        let detalles = `🏖️ *${nombre}*\n\n` +
+            `👥 Capacidad: ${tipo.capacidad} personas\n` +
+            `🛏️ Habitaciones: ${tipo.habitaciones} | 🚿 Baños: ${tipo.baños}\n` +
+            `💰 Precio por noche: ${precio}\n\n` +
+            `${descripcion}\n\n` +
             `🔄 ¿Siguiente paso?\n1. ← Ver todas las cabañas\n2. Reservar esta cabaña\n0. Menú principal 🏠`;
         
         try {
-            const medios = cabaña.fotos || [];
-            const urlsValidas = medios.filter(url => isValidUrl(url));
+            const fotos = Array.isArray(tipo.fotos) ? tipo.fotos : (tipo.fotos ? JSON.parse(tipo.fotos) : []);
+            const urlsValidas = fotos.filter(url => isValidUrl(url));
 
             const imageUrls = urlsValidas.filter(url => /\.(jpg|jpeg|png|gif|webp)$/i.test(url));
             const videoUrls = urlsValidas.filter(url => /\.(mp4|mov|avi|mkv)$/i.test(url));

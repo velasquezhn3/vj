@@ -143,7 +143,7 @@ async function handleConfirmarCommand(bot, remitente, param, mensajeObj) {
 
     logger.info('Normalized userId:', userId);
 
-    const latestState = obtenerEstado(userId + '@s.whatsapp.net');
+    const latestState = await obtenerEstado(userId + '@s.whatsapp.net');
     const datos = latestState?.datos || {};
     let userName = datos.nombre || null;
     let totalPrice = datos.precioTotal || 0;
@@ -309,7 +309,7 @@ async function handleConfirmarCommandRobust(bot, remitente, param, mensajeObj) {
     userId = normalizePhoneNumber(userId);
     logger.info('🛡️ [CONFIRMAR ROBUSTO] Normalized userId:', userId);
 
-    const latestState = obtenerEstado(userId + '@s.whatsapp.net');
+    const latestState = await obtenerEstado(userId + '@s.whatsapp.net');
     console.log('🔍 [DEBUG] Estado completo obtenido:', JSON.stringify(latestState, null, 2));
     
     // Extraer datos correctamente del estado
@@ -524,7 +524,7 @@ El Equipo de Reservas Vj 💚
         
         // Intentar obtener datos del estado primero
         const userJid = userId + '@s.whatsapp.net';
-        const state = obtenerEstado(userJid);
+        const state = await obtenerEstado(userJid);
         const datosReales = state?.datos || null;
         
         // Buscar usuario en BD

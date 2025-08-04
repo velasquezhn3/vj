@@ -43,7 +43,10 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
             return;
         }
 
-        const { estado, datos } = obtenerEstado(remitente);
+        const estadoData = await obtenerEstado(remitente);
+        const estado = estadoData.estado;
+        const datos = estadoData.datos;
+        
         logger.debug(`Procesando estado [${estado}] para ${remitente}`, {
             message: mensajeTexto
         });
@@ -189,9 +192,9 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
             // Si el estado no es manejado, verificar si es un estado que debe preservarse
             const estadosAPreservar = ['esperando_pago', 'ESPERANDO_PAGO', 'esperando_confirmacion', 'ESPERANDO_CONFIRMACION'];
             
-            if (estadosAPreservar.includes(estadoActual.estado)) {
+            if (estadosAPreservar.includes(estado)) {
                 // Para estados críticos, solo dar una advertencia pero mantener el estado
-                logger.warn(`Mensaje no válido en estado crítico: ${estadoActual.estado}`, { userId: remitente });
+                logger.warn(`Mensaje no válido en estado crítico: ${estado}`, { userId: remitente });
                 await bot.sendMessage(remitente, {
                     text: '⏳ Tu reserva está en proceso. Por favor espera la confirmación del administrador.'
                 });
@@ -214,7 +217,7 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
 
         try {
             // Verificar si es un estado crítico que no debe resetearse
-            const estadoActual = obtenerEstado(remitente);
+            const estadoActual = await obtenerEstado(remitente);
             const estadosAPreservar = ['esperando_pago', 'ESPERANDO_PAGO', 'esperando_confirmacion', 'ESPERANDO_CONFIRMACION'];
             
             if (estadosAPreservar.includes(estadoActual.estado)) {

@@ -1,4 +1,4 @@
-const cabañas = require('../data/cabañas.json');
+const cabinsDataService = require('../services/cabinsDataService');
 const actividadesData = require('../data/actividades.json');
 const WeatherModule = require('../services/weatherService');
 const { sendShareExperienceInstructions } = require('../routes/shareExperience');
@@ -28,16 +28,35 @@ async function safeSend(bot, recipient, text) {
 }
 
 // Helper para generar menús dinámicos
-function generateDynamicMenu(items, itemType) {
-  if (items.length === 0) {
-    return `⚠️ No hay ${itemType} disponibles en este momento.`;
-  }
+async function generateDynamicMenu(itemType) {
+  try {
+    let items = [];
+    
+    if (itemType === 'cabañas') {
+      items = await cabinsDataService.getAllCabins();
+    } else if (itemType === 'actividades') {
+      items = Object.values(actividadesData);
+    }
+    
+    if (items.length === 0) {
+      return `⚠️ No hay ${itemType} disponibles en este momento.`;
+    }
 
-  const title = `Tenemos estas ${itemType} disponibles:\n`;
-  const list = items.map((item, index) => `${index + 1}. ${item.nombre}`).join('\n');
-  const instructions = '\nPor favor, selecciona el número para ver más detalles.';
-  
-  return title + list + instructions;
+    const title = `🏠 *Nuestros alojamientos disponibles:*\n\n`;
+    const list = items.map((item, index) => {
+      const name = item.name || item.nombre || `${itemType.slice(0, -1)} ${index + 1}`;
+      const capacity = item.capacity ? ` (${item.capacity} personas)` : '';
+      const price = item.basePrice && item.basePrice > 0 ? ` - $${item.basePrice}` : '';
+      return `${index + 1}. ${name}${capacity}${price}`;
+    }).join('\n');
+    
+    const instructions = '\n\n🔍 *Selecciona el número para ver detalles completos y fotos.*';
+    
+    return title + list + instructions;
+  } catch (error) {
+    console.error('Error generando menú dinámico:', error);
+    return `⚠️ Error al cargar ${itemType}. Por favor intenta de nuevo.`;
+  }
 }
 
 // Contenido de FAQs
@@ -67,7 +86,8 @@ const FAQ_CONTENT = `🏝️ *Preguntas Frecuentes – Villas frente al mar*\n\n
 async function handleMainMenuOptions(bot, remitente, mensaje, establecerEstado) {
   switch (mensaje) {
     case '1': // Alojamientos
-      await safeSend(bot, remitente, generateDynamicMenu(cabañas, 'cabañas'));
+      const menuCabanas = await generateDynamicMenu('cabañas');
+      await safeSend(bot, remitente, menuCabanas);
       await establecerEstado(remitente, STATES.LODGING);
       break;
 
@@ -79,7 +99,8 @@ async function handleMainMenuOptions(bot, remitente, mensaje, establecerEstado) 
       break;
 
     case '3': // Actividades
-      await safeSend(bot, remitente, generateDynamicMenu(actividadesData, 'actividades'));
+      const menuActividades = await generateDynamicMenu('actividades');
+      await safeSend(bot, remitente, menuActividades);
       await establecerEstado(remitente, STATES.ACTIVITIES);
       break;
 
@@ -243,5 +264,6 @@ async function buscarReservaActivaOPendiente(telefono) {
 
 module.exports = {
   handleMainMenuOptions,
+  generateDynamicMenu,
   STATES // Exportamos estados si se necesitan en otros módulos
 };

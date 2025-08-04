@@ -58,8 +58,10 @@ app.use(adminReservationsRoutes);
 const conversationStatesService = require('./services/conversationStatesService');
 
 const adminDashboardRoutes = require('./routes/adminDashboard');
+const adminCabinTypesRoutes = require('./routes/adminCabinTypes');
 
 app.use(adminDashboardRoutes);
+app.use(adminCabinTypesRoutes);
 
 // Activities routes
 const fs = require('fs');

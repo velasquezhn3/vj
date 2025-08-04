@@ -1,0 +1,246 @@
+{
+  "metadata": {
+    "version": "2.0",
+    "last_updated": "2025-08-02T00:00:00Z",
+    "total_physical_units": 13,
+    "data_source": "official",
+    "validation_status": "verified"
+  },
+  "cabin_types": [
+    {
+      "id": "tortuga",
+      "name": "Cabaña Tortuga",
+      "display_name": "Cabaña Tortuga (3 Personas)",
+      "capacity": {
+        "max_guests": 3,
+        "recommended_guests": 2,
+        "rooms": 1,
+        "bathrooms": 1
+      },
+      "pricing": {
+        "base_price": 1500,
+        "currency": "HNL",
+        "seasonal_multiplier": {
+          "high_season": 1.3,
+          "low_season": 0.9
+        }
+      },
+      "amenities": [
+        "Piscina compartida",
+        "WiFi",
+        "Cocina equipada",
+        "Aire acondicionado",
+        "1 parqueo"
+      ],
+      "layout": {
+        "total_area_m2": 45,
+        "bedroom": {
+          "beds": ["1 matrimonial", "1 individual"],
+          "ac": true
+        },
+        "kitchen": {
+          "type": "cocineta",
+          "appliances": ["refrigeradora pequeña", "estufa 2 hornillas", "microondas"]
+        },
+        "bathroom": {
+          "private": true,
+          "shower": true
+        }
+      },
+      "physical_units": {
+        "total": 3,
+        "unit_names": ["Cabaña Tortuga 1", "Cabaña Tortuga 2", "Cabaña Tortuga 3"]
+      },
+      "gallery": [
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_1_pckc3x.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_2_ov26wn.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_3_q3wrdj.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_4_e9prqi.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_5_tlyprh.jpg"
+      ],
+      "description": {
+        "short": "Apartamento acogedor de 1 cuarto para hasta 3 personas, ideal para parejas o familias pequeñas.",
+        "full": "Sera un placer atenderle en las bellas playas de Tela. 🏝En Villas Julie le ofrecemos un Apartamento de un cuarto 🏠 para un Máximo de 3 personas, ubicada a media cuadra de la mejor playa de Tela.\n\nEl Apartamento tiene las siguientes áreas:\n\nCUARTO\nCuenta con una cama matrimonial , una unipersonal, Aire Acondicionado y baño. 🛌 🛁\n\nCOCINETA\n🍳Cocineta pequeña  con Refrigeradora pequeña , Estufa de dos hornillas , Microondas, y accesorios básicos de Cocina"
+      },
+      "policies": {
+        "check_in": "14:00",
+        "check_out": "11:00",
+        "min_stay_nights": 1,
+        "max_stay_nights": 30,
+        "cancellation_hours": 24,
+        "pets_allowed": false,
+        "smoking_allowed": false,
+        "visitors_allowed": false,
+        "quiet_hours": "23:00-07:00"
+      }
+    },
+    {
+      "id": "delfin",
+      "name": "Cabaña Delfín",
+      "display_name": "Cabaña Delfín (6 Personas)",
+      "capacity": {
+        "max_guests": 6,
+        "recommended_guests": 4,
+        "rooms": 2,
+        "bathrooms": 2
+      },
+      "pricing": {
+        "base_price": 4500,
+        "currency": "HNL",
+        "seasonal_multiplier": {
+          "high_season": 1.3,
+          "low_season": 0.9
+        }
+      },
+      "amenities": [
+        "Piscina compartida",
+        "WiFi",
+        "Cocina completa",
+        "Aire acondicionado",
+        "TV con cable",
+        "2 parqueos"
+      ],
+      "layout": {
+        "total_area_m2": 80,
+        "rooms": [
+          {
+            "name": "Cuarto Principal",
+            "beds": ["1 matrimonial", "1 individual"],
+            "ac": true,
+            "bathroom": "privado"
+          },
+          {
+            "name": "Cuarto Secundario", 
+            "beds": ["1 matrimonial", "1 individual"],
+            "ac": true,
+            "bathroom": "compartido"
+          }
+        ],
+        "kitchen": {
+          "type": "completa",
+          "appliances": ["refrigeradora", "estufa", "microondas", "cafetera", "licuadora"]
+        },
+        "living_room": {
+          "tv": true,
+          "cable": true
+        }
+      },
+      "physical_units": {
+        "total": 2,
+        "unit_names": ["Cabaña Delfín 1", "Cabaña Delfín 2"]
+      },
+      "policies": {
+        "check_in": "14:00",
+        "check_out": "11:00",
+        "min_stay_nights": 2,
+        "max_stay_nights": 30,
+        "cancellation_hours": 48,
+        "pets_allowed": false,
+        "smoking_allowed": false,
+        "visitors_allowed": false,
+        "quiet_hours": "23:00-07:00"
+      }
+    },
+    {
+      "id": "tiburon",
+      "name": "Cabaña Tiburón",
+      "display_name": "Cabaña Tiburón (9 Personas)",
+      "capacity": {
+        "max_guests": 9,
+        "recommended_guests": 6,
+        "rooms": 3,
+        "bathrooms": 2
+      },
+      "pricing": {
+        "base_price": 5000,
+        "currency": "HNL",
+        "seasonal_multiplier": {
+          "high_season": 1.4,
+          "low_season": 0.85
+        }
+      },
+      "amenities": [
+        "Piscina compartida",
+        "WiFi",
+        "Cocina completa",
+        "Aire acondicionado",
+        "TV con cable",
+        "2 parqueos"
+      ],
+      "layout": {
+        "total_area_m2": 120,
+        "rooms": [
+          {
+            "name": "Cuarto Principal",
+            "beds": ["1 matrimonial", "1 individual"],
+            "ac": true,
+            "bathroom": "privado"
+          },
+          {
+            "name": "Cuarto Secundario",
+            "beds": ["1 matrimonial", "1 individual"],
+            "ac": true,
+            "bathroom": "compartido"
+          },
+          {
+            "name": "Cuarto Terciario",
+            "beds": ["2 individuales"],
+            "ac": true,
+            "bathroom": "compartido"
+          }
+        ],
+        "kitchen": {
+          "type": "completa",
+          "appliances": ["refrigeradora", "estufa", "microondas", "cafetera", "licuadora"]
+        },
+        "living_room": {
+          "tv": true,
+          "cable": true
+        }
+      },
+      "physical_units": {
+        "total": 8,
+        "unit_names": [
+          "Cabaña Tiburón 1", "Cabaña Tiburón 2", "Cabaña Tiburón 3", "Cabaña Tiburón 4",
+          "Cabaña Tiburón 5", "Cabaña Tiburón 6", "Cabaña Tiburón 7", "Cabaña Tiburón 8"
+        ]
+      },
+      "policies": {
+        "check_in": "14:00",
+        "check_out": "11:00",
+        "min_stay_nights": 2,
+        "max_stay_nights": 30,
+        "cancellation_hours": 48,
+        "pets_allowed": false,
+        "smoking_allowed": false,
+        "visitors_allowed": false,
+        "quiet_hours": "23:00-07:00"
+      }
+    }
+  ],
+  "shared_facilities": {
+    "pool": {
+      "type": "compartida",
+      "hours": "06:00-21:00",
+      "rules": ["No alimentos", "No bebidas", "Respetar horarios"]
+    },
+    "bbq_area": {
+      "available": true,
+      "equipment": "asador pequeño",
+      "bring_your_own": ["carbón"]
+    },
+    "location": {
+      "address": "Tela, Atlántida",
+      "distance_to_beach": "0.5 cuadras",
+      "coordinates": {
+        "lat": 15.7738,
+        "lng": -87.4553
+      }
+    }
+  },
+  "contact": {
+    "whatsapp": "+504-XXXX-XXXX",
+    "email": "reservas@villasjulie.com",
+    "website": "www.villasjulie.com"
+  }
+}

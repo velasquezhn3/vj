@@ -3,6 +3,8 @@ const path = require('path');
 const moment = require('moment');
 require('moment/locale/es');
 const { addKeyword } = require('@bot-whatsapp/bot');
+const { loadMenuCabinTypes, checkDisponibilidad, parsearFechas } = require('../../services/menuCabinTypesService');
+const { addReserva } = require('../../services/alojamientosService');
 
 // ====================
 // 1. Configuración inicial
@@ -34,9 +36,10 @@ const safeWriteFile = (filePath, data) => {
 };
 
 // ====================
-// 3. Gestión de datos
+// 3. Gestión de datos - ACTUALIZADO PARA USAR TABLA CabinTypes
 // ====================
-const loadCabañas = () => {
+// Función mantenida para compatibilidad con el sistema de backup local
+const loadCabañasLegacy = () => {
   const data = safeReadFile(DB_PATH);
   if (!data) {
     console.warn('No se encontró el archivo de cabañas, creando uno vacío');
@@ -51,6 +54,9 @@ const loadCabañas = () => {
     return [];
   }
 };
+
+// Nueva función que carga tipos de menú desde tabla CabinTypes
+const loadCabañas = loadMenuCabinTypes;
 
 const createBackup = () => {
   try {
@@ -78,83 +84,16 @@ const createBackup = () => {
   }
 };
 
-// Crear backup inicial
-createBackup();
+// Backup ya no es necesario - los datos están en la base de datos
 
 // ====================
-// 4. Funciones de negocio
+// 4. Funciones de negocio (importadas del servicio)
 // ====================
-const checkDisponibilidad = (cabaña, fechaEntrada, fechaSalida) => {
-  if (!cabaña.reservas) return true;
-  
-  return !cabaña.reservas.some(reserva => {
-    if (reserva.estado !== 'confirmada') return false;
-    
-    const resInicio = moment(reserva.fecha_inicio);
-    const resFin = moment(reserva.fecha_fin);
-    
-    return fechaEntrada.isBefore(resFin) && fechaSalida.isAfter(resInicio);
-  });
-};
-
-const parsearFechas = (texto) => {
-  // Formato 1: "15-18 agosto"
-  let match = texto.match(/(\d{1,2})\s*[-a]+\s*(\d{1,2})\s+(?:de\s+)?(\w+)/i);
-  
-  // Formato 2: "15/08 - 18/08"
-  if (!match) {
-    match = texto.match(/(\d{1,2})\/(\d{1,2})\s*[-a]+\s*(\d{1,2})\/(\d{1,2})/i);
-  }
-  
-  if (!match) return null;
-  
-  const añoActual = moment().year();
-  let entrada, salida;
-  
-  if (match[3] && match[3].match(/[a-z]/i)) {
-    // Formato de texto: "15-18 agosto"
-    const mesNombre = match[3].toLowerCase();
-    const meses = {
-      enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-      julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
-    };
-    
-    if (!meses[mesNombre]) return null;
-    
-    entrada = moment({ year: añoActual, month: meses[mesNombre], day: parseInt(match[1]) });
-    salida = moment({ year: añoActual, month: meses[mesNombre], day: parseInt(match[2]) });
-  } else {
-    // Formato numérico: "15/08 - 18/08"
-    entrada = moment(`${parseInt(match[1])}/${parseInt(match[2])}/${añoActual}`, 'DD/MM/YYYY');
-    salida = moment(`${parseInt(match[3])}/${parseInt(match[4])}/${añoActual}`, 'DD/MM/YYYY');
-  }
-  
-  // Validar fechas
-  if (!entrada.isValid() || !salida.isValid() || salida.isBefore(entrada)) {
-    return null;
-  }
-  
-  return { entrada, salida };
-};
-
-const addReserva = async (cabañaId, reservaData) => {
-  const cabañas = loadCabañas();
-  const cabañaIndex = cabañas.findIndex(c => c.id === cabañaId);
-  
-  if (cabañaIndex === -1) return false;
-  
-  // Crear array de reservas si no existe
-  if (!cabañas[cabañaIndex].reservas) {
-    cabañas[cabañaIndex].reservas = [];
-  }
-  
-  cabañas[cabañaIndex].reservas.push(reservaData);
-  createBackup(); // Crear backup antes de guardar
-  return safeWriteFile(DB_PATH, cabañas);
-};
+// Las funciones checkDisponibilidad y parsearFechas 
+// ahora se importan desde menuCabinTypesService
 
 // ====================
-// 5. Descripciones modularizadas
+// 5. Descripciones modularizadas - ACTUALIZADAS
 // ====================
 const CABANA_DESCRIPCIONES = {
   tortuga: {
@@ -185,8 +124,8 @@ const CABANA_DESCRIPCIONES = {
     - 🚭 Prohibido fumar dentro
     - Respetar el silencio después de las 11 PM`
   },
-  caracol: {
-    nombre: 'Cabaña Caracol',
+  delfin: {
+    nombre: 'Cabaña Delfín',
     descripcion: `Sera un placer atenderle en las bellas playas de Tela. 🏝En Villas Julie le ofrecemos una cabaña de dos cuartos y dos baños 🏠 para un Máximo de 6 personas.
 
     **CUARTOS** 
@@ -215,7 +154,7 @@ const CABANA_DESCRIPCIONES = {
   },
   tiburon: {
     nombre: 'Cabaña Tiburón',
-    descripcion: `Sera un placer atenderle en las bellas playas de Tela. 🏝 Cabaña con tres cuartos y dos baños para 8 personas.
+    descripcion: `Sera un placer atenderle en las bellas playas de Tela. 🏝 Cabaña con tres cuartos y dos baños para 9 personas.
 
     **CUARTOS**
     - Principal: cama matrimonial + unipersonal, A/C, baño
@@ -245,18 +184,18 @@ const CABANA_DESCRIPCIONES = {
 };
 
 // ====================
-// 6. Flujo de conversación
+// 6. Flujo de conversación - ACTUALIZADO PARA BD
 // ====================
 const flowAlojamientos = addKeyword(['1', 'alojamiento', 'cabañas'])
   .addAnswer(
     '🏖️ *Villas Julie - Opciones de Alojamiento*\n\n' +
     '1. Cabaña Tortuga - Apartamento (1 cuarto, 3 personas)\n' +
-    '2. Cabaña Caracol - Cabaña (2 cuartos, 6 personas)\n' +
-    '3. Cabaña Tiburón - Cabaña (3 cuartos, 8 personas)\n\n' +
+    '2. Cabaña Delfín - Cabaña (2 cuartos, 6 personas)\n' +
+    '3. Cabaña Tiburón - Cabaña (3 cuartos, 9 personas)\n\n' +
     'Por favor selecciona el número de la opción que te interesa:',
     { capture: true },
     async (ctx, { flowDynamic, endFlow }) => {
-      const cabañas = loadCabañas();
+      const cabañas = await loadCabañas();
       const seleccion = parseInt(ctx.body.trim());
 
       if (isNaN(seleccion) || seleccion < 1 || seleccion > cabañas.length) {
@@ -274,8 +213,14 @@ const flowAlojamientos = addKeyword(['1', 'alojamiento', 'cabañas'])
       }
 
       const cabaña = cabañas[seleccion - 1];
-      const cabañaKey = cabaña.nombre.toLowerCase().includes('tortuga') ? 'tortuga' : 
-                        cabaña.nombre.toLowerCase().includes('caracol') ? 'caracol' : 'tiburon';
+      
+      // Determinar el tipo correcto basado en la capacidad y nombre
+      let cabañaKey = 'tortuga'; // default
+      if (cabaña.capacidad >= 9 || cabaña.type === 'tiburon') {
+        cabañaKey = 'tiburon';
+      } else if (cabaña.capacidad >= 6 || cabaña.type === 'delfin') {
+        cabañaKey = 'delfin';
+      }
 
       // Enviar descripción en partes
       const descParts = CABANA_DESCRIPCIONES[cabañaKey].descripcion.split('\n\n');

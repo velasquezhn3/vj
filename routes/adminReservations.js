@@ -112,4 +112,74 @@ router.delete('/admin/reservations/:id', async (req, res) => {
   }
 });
 
+// GET /admin/reservations/upcoming - get upcoming reservations (check-ins and check-outs in next 24-72h)
+router.get('/admin/reservations/upcoming', async (req, res) => {
+  try {
+    const now = new Date();
+    const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const next72h = new Date(now.getTime() + 72 * 60 * 60 * 1000);
+    
+    // Format dates for SQLite (YYYY-MM-DD format)
+    const today = now.toISOString().split('T')[0];
+    const tomorrow = next24h.toISOString().split('T')[0];
+    const dayAfterTomorrow = next72h.toISOString().split('T')[0];
+    
+    const sql = `
+      SELECT 
+        r.reservation_id, 
+        r.cabin_id, 
+        r.user_id, 
+        r.start_date, 
+        r.end_date, 
+        r.status, 
+        r.total_price,
+        r.personas,
+        u.name AS user_name,
+        u.phone_number AS phone_number,
+        c.name AS cabin_name,
+        c.capacity AS cabin_capacity,
+        CASE 
+          WHEN r.start_date BETWEEN ? AND ? THEN 'check_in'
+          WHEN r.end_date BETWEEN ? AND ? THEN 'check_out'
+          ELSE 'other'
+        END as event_type,
+        CASE 
+          WHEN r.start_date = ? OR r.end_date = ? THEN 'today'
+          WHEN r.start_date = ? OR r.end_date = ? THEN 'tomorrow'
+          ELSE 'later'
+        END as urgency
+      FROM Reservations r
+      LEFT JOIN Users u ON r.user_id = u.user_id
+      LEFT JOIN Cabins c ON r.cabin_id = c.cabin_id
+      WHERE 
+        (r.start_date BETWEEN ? AND ? OR r.end_date BETWEEN ? AND ?)
+        AND r.status IN ('confirmado', 'pendiente', 'confirmada')
+      ORDER BY 
+        CASE 
+          WHEN r.start_date = ? OR r.end_date = ? THEN 1
+          WHEN r.start_date = ? OR r.end_date = ? THEN 2
+          ELSE 3
+        END,
+        r.start_date ASC,
+        r.end_date ASC
+    `;
+    
+    const reservations = await db.runQuery(sql, [
+      today, dayAfterTomorrow, // check-in range
+      today, dayAfterTomorrow, // check-out range
+      today, today, // today comparisons
+      tomorrow, tomorrow, // tomorrow comparisons
+      today, dayAfterTomorrow, // main where clause check-in
+      today, dayAfterTomorrow, // main where clause check-out
+      today, today, // final ordering today
+      tomorrow, tomorrow // final ordering tomorrow
+    ]);
+    
+    res.json(reservations);
+  } catch (error) {
+    console.error('Error fetching upcoming reservations:', error);
+    res.status(500).json({ success: false, message: 'Error fetching upcoming reservations' });
+  }
+});
+
 module.exports = router;

@@ -2,6 +2,7 @@ const moment = require('moment');
 require('moment/locale/es');
 const db = require('../db');
 
+// Función original que trae todas las cabañas
 const loadCabañas = async () => {
   try {
     const cabins = await db.runQuery('SELECT * FROM Cabins');
@@ -17,6 +18,116 @@ const loadCabañas = async () => {
     console.error('Error loading cabins from DB:', e);
     return [];
   }
+};
+
+// Nueva función que devuelve solo los tipos únicos para el menú
+const loadTiposCabañas = async () => {
+  try {
+    // Obtener un representante de cada tipo
+    const tiposQuery = `
+      SELECT 
+        type,
+        MIN(cabin_id) as cabin_id,
+        name,
+        capacity,
+        description,
+        price,
+        photos
+      FROM Cabins 
+      WHERE type IS NOT NULL 
+      GROUP BY type 
+      ORDER BY 
+        CASE type 
+          WHEN 'tortuga' THEN 1 
+          WHEN 'delfin' THEN 2 
+          WHEN 'tiburon' THEN 3 
+          ELSE 4 
+        END
+    `;
+    
+    const tipos = await db.runQuery(tiposQuery);
+    
+    // Agregar información adicional de cabañas.json para mantener compatibilidad
+    const tiposConInfo = tipos.map(tipo => {
+      const infoExtra = getExtraInfoForType(tipo.type);
+      return {
+        ...tipo,
+        ...infoExtra,
+        // Mantener campos originales para compatibilidad
+        nombre: tipo.name.replace(/\s\d+$/, ''), // Remover número al final
+        tipo: getDisplayType(tipo.type),
+        capacidad: tipo.capacity,
+        precio_noche: tipo.price,
+        reservas: [] // Se llenará si es necesario
+      };
+    });
+    
+    return tiposConInfo;
+  } catch (e) {
+    console.error('Error loading cabin types from DB:', e);
+    return [];
+  }
+};
+
+// Información adicional para cada tipo (desde cabañas.json)
+const getExtraInfoForType = (type) => {
+  const extraInfo = {
+    tortuga: {
+      habitaciones: 1,
+      baños: 1,
+      fotos: [
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_1_pckc3x.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_2_ov26wn.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_3_q3wrdj.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751586373/cab1_4_e9prqi.jpg"
+      ],
+      comodidades: ["Piscina privada", "WiFi", "Cocina equipada"],
+      ubicacion: {
+        ciudad: "Tela Atlántida",
+        departamento: "Atlántida"
+      }
+    },
+    delfin: {
+      habitaciones: 2,
+      baños: 2,
+      fotos: [
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931157/WhatsApp_Image_2025-07-07_at_12.24.40_PM_2_yfxzze.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931158/WhatsApp_Image_2025-07-07_at_12.24.41_PM_1_rgrpaf.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751931157/WhatsApp_Image_2025-07-07_at_12.24.41_PM_ok5spo.jpg"
+      ],
+      comodidades: ["Piscina privada", "WiFi", "Cocina equipada"],
+      ubicacion: {
+        ciudad: "Tela Atlántida",
+        departamento: "Atlántida"
+      }
+    },
+    tiburon: {
+      habitaciones: 3,
+      baños: 2,
+      fotos: [
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927030/cab2_11_pfog3z.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927030/cab2_4_dyt1oo.jpg",
+        "https://res.cloudinary.com/dpajxjfyj/image/upload/v1751927030/cab2_3_tvwtpn.jpg"
+      ],
+      comodidades: ["Piscina privada", "WiFi", "Cocina equipada"],
+      ubicacion: {
+        ciudad: "Tela Atlántida",
+        departamento: "Atlántida"
+      }
+    }
+  };
+  
+  return extraInfo[type] || {};
+};
+
+// Convertir tipo de base a nombre para display
+const getDisplayType = (type) => {
+  const displayTypes = {
+    'tortuga': '3 personas',
+    'delfin': '6 personas', 
+    'tiburon': '9 personas'
+  };
+  return displayTypes[type] || type;
 };
 
 const checkDisponibilidad = (cabaña, fechaEntrada, fechaSalida) => {
@@ -238,7 +349,8 @@ async function getReservationByPhone(phoneNumber) {
 }
 
 module.exports = {
-  loadCabañas,
+  loadCabañas,           // Función original para todas las cabañas
+  loadTiposCabañas,      // Nueva función para tipos únicos
   checkDisponibilidad,
   parsearFechas,
   addReserva,
