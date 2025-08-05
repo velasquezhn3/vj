@@ -52,6 +52,19 @@ function parseDateRange(texto) {
         const mes = match[5];
         let año = match[8] ? parseInt(match[8]) : dayjs().year(); // Usar año parseado o actual
         
+        // Si no se especificó año, verificar si el mes ya pasó
+        if (!match[8]) {
+          const fechaTemporal = dayjs(`1/${mes}/${año}`, 'D/MMMM/YYYY', 'es');
+          const mesNumero = fechaTemporal.month(); // 0-11 (enero=0, diciembre=11)
+          const mesActual = dayjs().month();
+          
+          // Si el mes ya pasó este año, usar el año siguiente
+          if (mesNumero < mesActual) {
+            año = año + 1;
+            console.log(`[DEBUG] Mes ${mes} ya pasó en ${año-1}, usando año ${año}`);
+          }
+        }
+        
         console.log(`[DEBUG] Parseando rango: día1=${dia1}, día2=${dia2}, mes=${mes}, año=${año}`);
         
         const fecha1 = dayjs(`${dia1}/${mes}/${año}`, 'D/MMMM/YYYY', 'es');
@@ -100,4 +113,43 @@ function parseDateRange(texto) {
   };
 }
 
-module.exports = { parseDateRange };
+/**
+ * Parseador de mensajes para fechas (para compatibilidad con tests)
+ * @param {string} message - Mensaje con fechas
+ * @returns {Object} Resultado del parsing
+ */
+function parseMessage(message) {
+  try {
+    // Usar el parser existente
+    const result = parseDateRange(message);
+    
+    if (result.error) {
+      return {
+        isValid: false,
+        error: result.error,
+        message: message
+      };
+    }
+    
+    // Convertir al formato esperado por los tests
+    return {
+      isValid: true,
+      start_date: result.entrada, // YYYY-MM-DD
+      end_date: result.salida,    // YYYY-MM-DD
+      start_day: result.diaEntrada,
+      end_day: result.diaSalida,
+      original_message: message,
+      parsed_message: result.mensaje
+    };
+    
+  } catch (error) {
+    console.error('❌ Error en parseMessage:', error);
+    return {
+      isValid: false,
+      error: 'Error al procesar el mensaje de fechas',
+      message: message
+    };
+  }
+}
+
+module.exports = { parseDateRange, parseMessage };

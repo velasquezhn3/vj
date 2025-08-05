@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de Reservas - Bot VJ</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .chat-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+        }
+        .test-title {
+            color: #2196F3;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .test-case {
+            background: #f8f9fa;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .test-input {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 5px 0;
+        }
+        .expected-output {
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+        .button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #1976D2;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 Test de Reservas - Bot VJ</h1>
+    <p>Esta página permite probar las mejoras implementadas en el sistema de reservas.</p>
+
+    <div class="test-section">
+        <div class="test-title">🎯 Objetivo de las Pruebas</div>
+        <p>Verificar que el bot ahora acepta múltiples formatos de fecha y muestra mensajes mejorados:</p>
+        <ul>
+            <li>✅ Formato estándar: <code>15/08/2025 al 18/08/2025</code></li>
+            <li>✅ Formato natural: <code>15 al 18 de agosto</code></li>
+            <li>✅ Formato completo: <code>del 15 al 18 de agosto de 2025</code></li>
+            <li>✅ Mensajes de confirmación mejorados con fechas completas</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">📅 Casos de Prueba para Fechas</div>
+        
+        <div class="test-case">
+            <strong>Caso 1: Formato DD/MM/YYYY al DD/MM/YYYY</strong>
+            <div class="test-input">Input: "15/08/2025 al 18/08/2025"</div>
+            <div class="expected-output">
+                <strong>Resultado esperado:</strong><br>
+                ✅ Debe aceptar el formato<br>
+                📅 Mostrar: "jueves 15 de agosto de 2025 a las 2:00 PM"<br>
+                🌙 Calcular: 3 noches
+            </div>
+            <button class="button" onclick="testDateFormat('15/08/2025 al 18/08/2025')">Probar</button>
+            <div id="result1" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-case">
+            <strong>Caso 2: Formato natural sin año</strong>
+            <div class="test-input">Input: "15 al 18 de agosto"</div>
+            <div class="expected-output">
+                <strong>Resultado esperado:</strong><br>
+                ✅ Debe aceptar el formato (asumiendo año actual)<br>
+                📅 Mostrar fechas completas con día de la semana<br>
+                🌙 Calcular noches correctamente
+            </div>
+            <button class="button" onclick="testDateFormat('15 al 18 de agosto')">Probar</button>
+            <div id="result2" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-case">
+            <strong>Caso 3: Formato con "del"</strong>
+            <div class="test-input">Input: "del 15 al 18 de agosto de 2025"</div>
+            <div class="expected-output">
+                <strong>Resultado esperado:</strong><br>
+                ✅ Debe aceptar el formato<br>
+                📅 Mostrar confirmación con formato mejorado<br>
+                🌙 Calcular 3 noches
+            </div>
+            <button class="button" onclick="testDateFormat('del 15 al 18 de agosto de 2025')">Probar</button>
+            <div id="result3" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-case">
+            <strong>Caso 4: Formato inválido</strong>
+            <div class="test-input">Input: "mañana por la tarde"</div>
+            <div class="expected-output">
+                <strong>Resultado esperado:</strong><br>
+                ❌ Debe rechazar el formato<br>
+                💡 Mostrar ejemplos de formatos válidos<br>
+                🔄 Permitir reintentar
+            </div>
+            <button class="button" onclick="testDateFormat('mañana por la tarde')">Probar</button>
+            <div id="result4" class="result" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">🔧 Herramientas de Prueba</div>
+        <p>Puedes probar directamente los servicios del bot:</p>
+        
+        <div style="margin: 10px 0;">
+            <button class="button" onclick="testPriceService()">Probar Servicio de Precios</button>
+            <button class="button" onclick="testDateParser()">Probar Parser de Fechas</button>
+            <button class="button" onclick="checkServerStatus()">Estado del Servidor</button>
+        </div>
+        
+        <div id="toolResults" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">📝 Flujo Completo de Reserva</div>
+        <p>Para probar el flujo completo, necesitarás:</p>
+        <ol>
+            <li>📱 <strong>WhatsApp Business API configurado</strong> (o usar simulador)</li>
+            <li>🔗 <strong>Webhook conectado</strong> para recibir mensajes</li>
+            <li>👤 <strong>Número de teléfono de prueba</strong></li>
+        </ol>
+        
+        <div class="info">
+            <strong>💡 Instrucciones:</strong><br>
+            1. Envía "hola" al bot<br>
+            2. Selecciona "🏨 Hacer Reserva"<br>
+            3. Prueba con: <code>"15 al 18 de octubre"</code><br>
+            4. Verifica que el bot responda con fechas formateadas correctamente
+        </div>
+    </div>
+
+    <script>
+        function testDateFormat(input) {
+            const resultId = 'result' + (document.querySelectorAll('.test-case').length > 3 ? 
+                Array.from(document.querySelectorAll('.test-case')).findIndex(el => 
+                el.querySelector('.test-input').textContent.includes(input)) + 1 : 1);
+            
+            const resultDiv = document.getElementById(resultId);
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.innerHTML = '⏳ Probando formato de fecha...';
+            
+            // Simular llamada al parser
+            fetch('/api/test-date-parser', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dateInput: input })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        ✅ <strong>Fecha aceptada</strong><br>
+                        📅 Entrada: ${data.entrada}<br>
+                        🚪 Salida: ${data.salida}<br>
+                        🌙 Noches: ${data.noches}
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `❌ <strong>Error:</strong> ${data.error}`;
+                }
+            })
+            .catch(error => {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ <strong>Error de conexión:</strong> ${error.message}`;
+            });
+        }
+
+        function testPriceService() {
+            const resultDiv = document.getElementById('toolResults');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.innerHTML = '⏳ Probando servicio de precios...';
+            
+            fetch('/api/test-price-calculation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    cabinType: 'delfin', 
+                    startDate: '15/08/2025', 
+                    nights: 3 
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    ✅ <strong>Servicio de precios funcionando</strong><br>
+                    🏠 Tipo: ${data.cabinType}<br>
+                    💰 Precio: Lmps. ${data.totalPrice}
+                `;
+            })
+            .catch(error => {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+            });
+        }
+
+        function testDateParser() {
+            const resultDiv = document.getElementById('toolResults');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.innerHTML = '⏳ Probando parser de fechas...';
+            
+            const testCases = [
+                '15/08/2025 al 18/08/2025',
+                '15 al 18 de agosto',
+                'del 15 al 18 de agosto de 2025'
+            ];
+            
+            Promise.all(testCases.map(testCase => 
+                fetch('/api/test-date-parser', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dateInput: testCase })
+                }).then(r => r.json())
+            ))
+            .then(results => {
+                let html = '✅ <strong>Resultados del parser:</strong><br>';
+                results.forEach((result, i) => {
+                    html += `<br>${testCases[i]}: ${result.success ? '✅' : '❌'}`;
+                });
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = html;
+            })
+            .catch(error => {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+            });
+        }
+
+        function checkServerStatus() {
+            const resultDiv = document.getElementById('toolResults');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.innerHTML = '⏳ Verificando estado del servidor...';
+            
+            fetch('/test')
+            .then(response => response.json())
+            .then(data => {
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    ✅ <strong>Servidor funcionando</strong><br>
+                    📊 Status: ${data.status}<br>
+                    🕐 Tiempo: ${data.timestamp}
+                `;
+            })
+            .catch(error => {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Servidor no responde: ${error.message}`;
+            });
+        }
+
+        // Auto-verificar estado al cargar
+        document.addEventListener('DOMContentLoaded', checkServerStatus);
+    </script>
+</body>
+</html>

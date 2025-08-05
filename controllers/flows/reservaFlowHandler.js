@@ -8,6 +8,12 @@ const { ESTADOS_RESERVA } = require('../reservaConstants');
 const { createReservationWithUser, normalizePhoneNumber } = require('../../services/reservaService');
 const alojamientosService = require('../../services/alojamientosService');
 const { parseDateRange } = require('../../utils/dateRangeParser');
+const { 
+  validateHonduranPhone, 
+  sanitizeText,
+  validateReservation
+} = require('../../utils/validation');
+const logger = require('../../config/logger');
 
 // Funciones auxiliares para mejorar la legibilidad
 
@@ -47,36 +53,82 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
         console.log(`[DEBUG] Mensaje recibido para fechas: '${mensajeTexto}'`);
         switch (estado) {
             case ESTADOS_RESERVA.FECHAS: {
-                const resultado = parseDateRange(mensajeTexto);
-                console.log('[DEBUG] Resultado parseDateRange:', resultado);
-                if (resultado.error) {
-                    await bot.sendMessage(remitente, { text: `❌ ${resultado.error} Intenta con otro formato, ejemplo: *20/08/2025 al 25/08/2025*` });
+                logger.info('Procesando fechas de reserva', { 
+                    userId: remitente, 
+                    input: mensajeTexto 
+                });
+                
+                // Usar el parser flexible para múltiples formatos
+                const validacionFechas = parseDateRange(mensajeTexto);
+                
+                if (validacionFechas.error) {
+                    await bot.sendMessage(remitente, { 
+                        text: `❌ ${validacionFechas.error}\n\n💡 *Formatos aceptados:*\n` +
+                              `📅 15/08/2025 al 18/08/2025\n` +
+                              `📅 15 al 18 de agosto\n` +
+                              `📅 del 15 al 18 de agosto de 2025\n\n` +
+                              `🔄 *Intenta nuevamente con cualquiera de estos formatos*`
+                    });
+                    logger.warn('Fechas inválidas rechazadas', {
+                        userId: remitente,
+                        input: mensajeTexto,
+                        error: validacionFechas.error
+                    });
                     return;
                 }
-                const { entrada, salida, mensaje } = resultado;
-                const noches = calcularDiferenciaDias(entrada, salida);
-                if (noches < 1) {
-                    await bot.sendMessage(remitente, { text: '❌ La fecha de salida debe ser *posterior* a la entrada' });
-                    return;
-                }
-                // Confirmar fechas con el usuario
-                await bot.sendMessage(remitente, { text: mensaje });
                 
-                // Mensaje adicional para pedir confirmación
-                const mensajeConfirmacion = `
-📝 *Para continuar con tu reserva:*
-
-✅ Escribe *"SÍ"* para confirmar estas fechas
-❌ Escribe *"NO"* para ingresar nuevas fechas
-
-💡 *¿Estás listo para continuar?*`;
+                // Extraer información validada del parser
+                const fechaEntradaStr = validacionFechas.entrada; // DD/MM/YYYY
+                const fechaSalidaStr = validacionFechas.salida;   // DD/MM/YYYY
                 
-                await bot.sendMessage(remitente, { text: mensajeConfirmacion.trim() });
-                // Guardar fechas temporalmente y esperar confirmación
-                await establecerEstado(remitente, ESTADOS_RESERVA.CONFIRMAR_FECHAS, {
-                    fechaEntrada: entrada,
-                    fechaSalida: salida,
+                // Convertir a objetos Date para cálculos
+                const [diaEnt, mesEnt, añoEnt] = fechaEntradaStr.split('/');
+                const [diaSal, mesSal, añoSal] = fechaSalidaStr.split('/');
+                const fechaEntrada = new Date(añoEnt, mesEnt - 1, diaEnt);
+                const fechaSalida = new Date(añoSal, mesSal - 1, diaSal);
+                
+                // Calcular noches
+                const noches = Math.ceil((fechaSalida - fechaEntrada) / (1000 * 60 * 60 * 24));
+                
+                // Crear fechas completas más descriptivas
+                const fechaEntradaCompleta = formatearFechaCompleta(fechaEntradaStr);
+                const fechaSalidaCompleta = formatearFechaCompleta(fechaSalidaStr);
+
+                const datosActualizados = { 
+                    ...datos, 
+                    fechaEntrada: fechaEntradaStr, // Mantener formato DD/MM/YYYY
+                    fechaSalida: fechaSalidaStr,   // Mantener formato DD/MM/YYYY
+                    fechaEntradaFormatted: fechaEntradaCompleta,
+                    fechaSalidaFormatted: fechaSalidaCompleta,
                     noches
+                };
+
+                const confirmacionMensaje = `📅 *CONFIRMAR FECHAS DE RESERVA*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🏨 *Su día de entrada será el*
+     ${fechaEntradaCompleta} a las *2:00 PM*
+
+🚪 *Su día de salida será el*
+     ${fechaSalidaCompleta} a las *11:00 AM*
+
+🌙 *Total de noches:* ${noches}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+¿Son correctas estas fechas?
+
+✅ Escribe *"SÍ"* para confirmar
+❌ Escribe *"NO"* para cambiar`;
+
+                await bot.sendMessage(remitente, { text: confirmacionMensaje });
+                await establecerEstado(remitente, ESTADOS_RESERVA.CONFIRMAR_FECHAS, datosActualizados);
+                
+                logger.info('Fechas procesadas correctamente', {
+                    userId: remitente,
+                    startDate: datosActualizados.fechaEntrada,
+                    endDate: datosActualizados.fechaSalida,
+                    nights: noches
                 });
                 break;
             }
@@ -96,33 +148,104 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
             }
 
             case ESTADOS_RESERVA.NOMBRE: {
+                const nombreInput = sanitizeText(mensajeTexto);
+                
+                // Validar nombre usando nuestro validador
+                if (nombreInput.length < 2) {
+                    await bot.sendMessage(remitente, { 
+                        text: '❌ *El nombre debe tener al menos 2 caracteres.*\n\n📝 *Por favor, ingresa tu nombre completo:*' 
+                    });
+                    return;
+                }
+                
+                if (nombreInput.length > 100) {
+                    await bot.sendMessage(remitente, { 
+                        text: '❌ *El nombre es demasiado largo.*\n\n📝 *Por favor, ingresa un nombre más corto:*' 
+                    });
+                    return;
+                }
+                
+                if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombreInput)) {
+                    await bot.sendMessage(remitente, { 
+                        text: '❌ *El nombre solo puede contener letras y espacios.*\n\n📝 *Por favor, ingresa tu nombre completo:*' 
+                    });
+                    return;
+                }
+                
                 const telefono = remitente.split('@')[0];
-                await bot.sendMessage(remitente, { text: '👥 *¿Cuántas personas serán?*' });
-                console.log(`[TRACE] Setting nombre=${mensajeTexto.trim()} and telefono=${telefono} in datos`);
+                
+                // Validar teléfono hondureño
+                const phoneValidation = validateHonduranPhone(telefono);
+                if (!phoneValidation.isValid) {
+                    logger.warn('Teléfono inválido detectado', {
+                        userId: remitente,
+                        phone: telefono,
+                        error: phoneValidation.message
+                    });
+                }
+                
+                await bot.sendMessage(remitente, { text: '👥 *¿Cuántas personas serán?*\n\n💡 *Ingresa solo el número (ejemplo: 4)*' });
+                
+                logger.info('Nombre validado y guardado', {
+                    userId: remitente,
+                    name: nombreInput,
+                    phone: phoneValidation.formatted || telefono
+                });
+                
                 await establecerEstado(remitente, ESTADOS_RESERVA.PERSONAS, { 
                     ...datos, 
-                    nombre: mensajeTexto.trim(),
-                    telefono 
+                    nombre: nombreInput,
+                    telefono: phoneValidation.formatted || telefono
                 });
                 break;
             }
 
             case ESTADOS_RESERVA.PERSONAS: {
-                const cantidad = parseInt(mensajeTexto);
-                if (isNaN(cantidad) || cantidad < 1) {
-                    await bot.sendMessage(remitente, { text: '🔢 Por favor ingresa un *número válido* (ej: 4)' });
-                    return;
-                }
-                const tipoCabana = asignarAlojamiento(cantidad);
-                if (!tipoCabana) {
-                    await bot.sendMessage(remitente, {
-                        text: `⚠️ *Capacidad excedida* (${cantidad} personas)\nSugerencia: Alquila múltiples cabañas`
+                const cantidad = parseInt(mensajeTexto.trim());
+                
+                // Validar número de personas
+                if (isNaN(cantidad)) {
+                    await bot.sendMessage(remitente, { 
+                        text: '❌ *Por favor ingresa solo un número.*\n\n👥 *¿Cuántas personas serán?*\n💡 *Ejemplo: 4*' 
                     });
                     return;
                 }
+                
+                if (cantidad < 1) {
+                    await bot.sendMessage(remitente, { 
+                        text: '❌ *Debe ser mínimo 1 persona.*\n\n👥 *¿Cuántas personas serán?*' 
+                    });
+                    return;
+                }
+                
+                if (cantidad > 10) {
+                    await bot.sendMessage(remitente, {
+                        text: `❌ *Máximo 10 personas por reserva.*\n\n👥 Para grupos más grandes, considera hacer múltiples reservas.\n\n*¿Cuántas personas serán?*`
+                    });
+                    return;
+                }
+                
+                const tipoCabana = asignarAlojamiento(cantidad);
+                if (!tipoCabana) {
+                    await bot.sendMessage(remitente, {
+                        text: `⚠️ *Capacidad excedida* (${cantidad} personas)\n\n🏠 *Sugerencia:* Considera múltiples cabañas o reduce el número de huéspedes.\n\n👥 *¿Cuántas personas serán?*`
+                    });
+                    logger.warn('Capacidad excedida', {
+                        userId: remitente,
+                        requestedGuests: cantidad
+                    });
+                    return;
+                }
+                
+                logger.info('Número de personas validado', {
+                    userId: remitente,
+                    guests: cantidad,
+                    assignedCabinType: tipoCabana
+                });
+                
                 await bot.sendMessage(remitente, {
                     text: `🏠 *Asignado automáticamente:*
-*${tipoCabana}* para ${cantidad} persona(s)`
+*${tipoCabana.toUpperCase()}* para ${cantidad} persona(s)`
                 });
                 try {
                     const precioTotal = calcularPrecioTotal(
@@ -144,7 +267,7 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
 📞 *Teléfono:* ${datos.telefono}
 📅 *Fechas:* ${fechaEntradaFormatted} hasta ${fechaSalidaFormatted}
 🌙 *Noches:* ${datos.noches}
-� *Personas:* ${cantidad}
+👥 *Personas:* ${cantidad}
 🏠 *Alojamiento:* ${tipoCabana.toUpperCase()}
 💵 *Total:* Lmps. ${precioTotal.toLocaleString()}
 
@@ -228,7 +351,7 @@ async function handleReservaState(bot, remitente, mensajeTexto, estado, datos, m
                 await enviarAlGrupo(bot, resumen);
                 await enviarAlGrupo(bot, `/confirmar ${datos.telefono}`);
                 await bot.sendMessage(remitente, { 
-                    text: '📤 Reserva enviada para confirmación\n\n 💳 *Porfavor esperar admistracion confirme su Reserva:*' 
+                    text: '📤 Reserva enviada para confirmación\n\n💳 *Por favor esperar administración confirme su Reserva:*' 
                 });
 
                 // Remove fetching latest pending reservation here to avoid reusing old reservation ID

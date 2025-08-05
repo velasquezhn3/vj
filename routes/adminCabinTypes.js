@@ -8,8 +8,8 @@ const {
   createCabinType 
 } = require('../services/menuCabinTypesService');
 
-// GET /admin/cabin-types - Obtener todos los tipos de menú
-router.get('/admin/cabin-types', async (req, res) => {
+// GET / - Obtener todos los tipos de menú
+router.get('/', async (req, res) => {
   try {
     const types = await loadMenuCabinTypes();
     res.json({
@@ -27,8 +27,8 @@ router.get('/admin/cabin-types', async (req, res) => {
   }
 });
 
-// GET /admin/cabin-types/:typeKey - Obtener un tipo específico
-router.get('/admin/cabin-types/:typeKey', async (req, res) => {
+// GET /:typeKey - Obtener un tipo específico
+router.get('/:typeKey', async (req, res) => {
   try {
     const { typeKey } = req.params;
     const type = await getCabinTypeByKey(typeKey);
@@ -54,8 +54,8 @@ router.get('/admin/cabin-types/:typeKey', async (req, res) => {
   }
 });
 
-// PUT /admin/cabin-types/:typeKey - Actualizar un tipo
-router.put('/admin/cabin-types/:typeKey', async (req, res) => {
+// PUT /:typeKey - Actualizar un tipo
+router.put('/:typeKey', async (req, res) => {
   try {
     const { typeKey } = req.params;
     const updateData = req.body;
@@ -98,8 +98,8 @@ router.put('/admin/cabin-types/:typeKey', async (req, res) => {
   }
 });
 
-// PATCH /admin/cabin-types/:typeKey/toggle - Activar/desactivar tipo
-router.patch('/admin/cabin-types/:typeKey/toggle', async (req, res) => {
+// PATCH /:typeKey/toggle - Activar/desactivar tipo
+router.patch('/:typeKey/toggle', async (req, res) => {
   try {
     const { typeKey } = req.params;
     const { activo } = req.body;
@@ -134,8 +134,8 @@ router.patch('/admin/cabin-types/:typeKey/toggle', async (req, res) => {
   }
 });
 
-// POST /admin/cabin-types - Crear nuevo tipo
-router.post('/admin/cabin-types', async (req, res) => {
+// POST / - Crear nuevo tipo
+router.post('/', async (req, res) => {
   try {
     const typeData = req.body;
     
@@ -188,8 +188,8 @@ router.post('/admin/cabin-types', async (req, res) => {
   }
 });
 
-// GET /admin/cabin-types/preview/menu - Vista previa del menú
-router.get('/admin/cabin-types/preview/menu', async (req, res) => {
+// GET /preview/menu - Vista previa del menú
+router.get('/preview/menu', async (req, res) => {
   try {
     const types = await loadMenuCabinTypes();
     

@@ -4,6 +4,15 @@ const db = require('../db');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { authenticateToken } = require('../middleware/auth');
+const { 
+  validateAdminReservation,
+  validateNumericId,
+  validateReservationFilters,
+  sanitizeRequestData,
+  logAdminActivity
+} = require('../middleware/apiValidation');
+const logger = require('../config/logger');
 
 // Setup multer for file uploads to public/comprobantes
 const storage = multer.diskStorage({
@@ -23,10 +32,100 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// GET /admin/reservations
-router.get('/admin/reservations', async (req, res) => {
+/**
+ * @swagger
+ * /admin/reservations:
+ *   get:
+ *     tags: [Reservations]
+ *     summary: Listar reservas
+ *     description: Obtiene todas las reservas con filtros opcionales y paginación
+ *     parameters:
+ *       - $ref: '#/components/parameters/LimitParam'
+ *       - $ref: '#/components/parameters/OffsetParam'
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pendiente, confirmado, cancelado, completado]
+ *           example: confirmado
+ *         description: Filtrar por estado de la reserva
+ *       - in: query
+ *         name: cabin_id
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         description: Filtrar por ID de cabaña
+ *       - in: query
+ *         name: user_id
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         description: Filtrar por ID de usuario
+ *       - in: query
+ *         name: start_date_from
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: 2024-08-01
+ *         description: Fecha de inicio mínima (YYYY-MM-DD)
+ *       - in: query
+ *         name: start_date_to
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: 2024-08-31
+ *         description: Fecha de inicio máxima (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: Lista de reservas obtenida exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Reservation'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     limit:
+ *                       type: integer
+ *                       example: 20
+ *                     offset:
+ *                       type: integer
+ *                       example: 0
+ *                     total:
+ *                       type: integer
+ *                       example: 45
+ *       401:
+ *         description: Token no válido o no proporcionado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *     security:
+ *       - bearerAuth: []
+ */
+// GET /
+router.get('/', 
+  authenticateToken,
+  sanitizeRequestData,
+  validateReservationFilters,
+  logAdminActivity('list_reservations'),
+  async (req, res) => {
   try {
-    const sql = `
+    let sql = `
       SELECT r.reservation_id, r.cabin_id, r.user_id, r.start_date, r.end_date, r.status, r.total_price, r.comprobante_nombre_archivo,
              r.personas,
              u.name AS user_name,
@@ -36,44 +135,294 @@ router.get('/admin/reservations', async (req, res) => {
       FROM Reservations r
       LEFT JOIN Users u ON r.user_id = u.user_id
       LEFT JOIN Cabins c ON r.cabin_id = c.cabin_id
-      ORDER BY r.created_at DESC
     `;
-    const reservations = await db.runQuery(sql);
-    res.json(reservations);
+    
+    const conditions = [];
+    const params = [];
+    
+    // Usar valores validados con defaults
+    const limit = req.query.limit || 50;
+    const offset = req.query.offset || 0;
+    
+    // Aplicar filtros validados
+    if (req.query.status) {
+      conditions.push('r.status = ?');
+      params.push(req.query.status);
+    }
+    
+    if (req.query.cabin_id) {
+      conditions.push('r.cabin_id = ?');
+      params.push(req.query.cabin_id);
+    }
+    
+    if (req.query.user_id) {
+      conditions.push('r.user_id = ?');
+      params.push(req.query.user_id);
+    }
+    
+    if (req.query.start_date_from) {
+      conditions.push('r.start_date >= ?');
+      params.push(req.query.start_date_from);
+    }
+    
+    if (req.query.start_date_to) {
+      conditions.push('r.start_date <= ?');
+      params.push(req.query.start_date_to);
+    }
+    
+    if (conditions.length > 0) {
+      sql += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    sql += ' ORDER BY r.created_at DESC';
+    
+    // Aplicar limit y offset con valores seguros
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), parseInt(offset));
+    
+    const reservations = await db.runQuery(sql, params);
+    
+    logger.info('Reservas consultadas exitosamente', {
+      adminUser: req.user.username,
+      filtersApplied: Object.keys(req.query).length,
+      resultsCount: reservations.length
+    });
+    
+    res.json({
+      success: true,
+      data: reservations,
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        total: reservations.length
+      }
+    });
   } catch (error) {
-    console.error('Error fetching reservations:', error);
-    res.status(500).json({ success: false, message: 'Error fetching reservations' });
+    logger.error('Error consultando reservas administrativas', { 
+      error: error.message,
+      adminUser: req.user?.username
+    });
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error consultando reservas',
+      code: 'DATABASE_ERROR'
+    });
   }
 });
 
-// POST /admin/reservations - create new reservation with optional comprobante upload
-router.post('/admin/reservations', upload.single('comprobante'), async (req, res) => {
+/**
+ * @swagger
+ * /admin/reservations:
+ *   post:
+ *     tags: [Reservations]
+ *     summary: Crear nueva reserva
+ *     description: Crea una nueva reserva con opción de subir comprobante de pago
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - cabin_id
+ *               - user_id
+ *               - start_date
+ *               - end_date
+ *               - number_of_people
+ *             properties:
+ *               cabin_id:
+ *                 type: integer
+ *                 example: 1
+ *                 description: ID de la cabaña a reservar
+ *               user_id:
+ *                 type: integer
+ *                 example: 1
+ *                 description: ID del usuario que realiza la reserva
+ *               start_date:
+ *                 type: string
+ *                 format: date
+ *                 example: 2024-08-15
+ *                 description: Fecha de check-in (YYYY-MM-DD)
+ *               end_date:
+ *                 type: string
+ *                 format: date
+ *                 example: 2024-08-17
+ *                 description: Fecha de check-out (YYYY-MM-DD)
+ *               status:
+ *                 type: string
+ *                 enum: [pendiente, confirmado, cancelado, completado]
+ *                 default: pendiente
+ *                 example: pendiente
+ *               total_price:
+ *                 type: number
+ *                 format: decimal
+ *                 example: 300.00
+ *                 description: Precio total de la reserva
+ *               number_of_people:
+ *                 type: integer
+ *                 example: 2
+ *                 description: Número de personas para la reserva
+ *               comprobante:
+ *                 type: string
+ *                 format: binary
+ *                 description: Archivo de comprobante de pago (opcional)
+ *     responses:
+ *       201:
+ *         description: Reserva creada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Reserva creada exitosamente
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     reservation_id:
+ *                       type: integer
+ *                       example: 123
+ *                     cabin_id:
+ *                       type: integer
+ *                       example: 1
+ *                     user_id:
+ *                       type: integer
+ *                       example: 1
+ *                     start_date:
+ *                       type: string
+ *                       format: date
+ *                       example: 2024-08-15
+ *                     end_date:
+ *                       type: string
+ *                       format: date
+ *                       example: 2024-08-17
+ *                     status:
+ *                       type: string
+ *                       example: pendiente
+ *                     total_price:
+ *                       type: number
+ *                       example: 300.00
+ *                     number_of_people:
+ *                       type: integer
+ *                       example: 2
+ *                     comprobante_uploaded:
+ *                       type: boolean
+ *                       example: true
+ *       400:
+ *         description: Datos de entrada inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Token no válido o no proporcionado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *     security:
+ *       - bearerAuth: []
+ */
+// POST / - create new reservation with optional comprobante upload
+router.post('/', 
+  authenticateToken,
+  upload.single('comprobante'),
+  sanitizeRequestData,
+  validateAdminReservation,
+  logAdminActivity('create_reservation'),
+  async (req, res) => {
   try {
     const { cabin_id, user_id, start_date, end_date, status, total_price, number_of_people } = req.body;
     let comprobante_nombre_archivo = null;
+    
     if (req.file) {
       comprobante_nombre_archivo = req.file.filename;
+      logger.info('Comprobante subido con nueva reserva', {
+        filename: comprobante_nombre_archivo,
+        size: req.file.size,
+        adminUser: req.user.username
+      });
     }
+    
     const sql = `
       INSERT INTO Reservations (cabin_id, user_id, start_date, end_date, status, total_price, comprobante_nombre_archivo, personas)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const result = await db.runExecute(sql, [cabin_id, user_id, start_date, end_date, status, total_price, comprobante_nombre_archivo, number_of_people]);
-    res.json({ success: true, reservation_id: result.lastID });
+    
+    logger.info('Reserva administrativa creada exitosamente', {
+      reservationId: result.lastID,
+      cabinId: cabin_id,
+      userId: user_id,
+      dateRange: `${start_date} to ${end_date}`,
+      guests: number_of_people,
+      totalPrice: total_price,
+      adminUser: req.user.username
+    });
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Reserva creada exitosamente',
+      data: {
+        reservation_id: result.lastID,
+        cabin_id,
+        user_id,
+        start_date,
+        end_date,
+        status,
+        total_price,
+        number_of_people,
+        comprobante_uploaded: !!comprobante_nombre_archivo
+      }
+    });
   } catch (error) {
-    console.error('Error creating reservation:', error);
-    res.status(500).json({ success: false, message: 'Error creating reservation' });
+    logger.error('Error creando reserva administrativa', { 
+      error: error.message,
+      requestData: req.body,
+      adminUser: req.user?.username
+    });
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error creando reserva',
+      code: 'CREATION_ERROR'
+    });
   }
 });
 
-// PUT /admin/reservations/:id - update reservation with optional comprobante upload
-router.put('/admin/reservations/:id', upload.single('comprobante'), async (req, res) => {
+// PUT /:id - update reservation with optional comprobante upload
+router.put('/:id', 
+  authenticateToken,
+  validateNumericId('id'),
+  upload.single('comprobante'),
+  sanitizeRequestData,
+  validateAdminReservation,
+  logAdminActivity('update_reservation'),
+  async (req, res) => {
   try {
     const reservationId = req.params.id;
     const { cabin_id, user_id, start_date, end_date, status, total_price, number_of_people } = req.body;
     let comprobante_nombre_archivo = null;
+    
     if (req.file) {
       comprobante_nombre_archivo = req.file.filename;
+      logger.info('Comprobante actualizado en reserva', {
+        reservationId,
+        filename: comprobante_nombre_archivo,
+        size: req.file.size,
+        adminUser: req.user.username
+      });
     }
 
     // Build SQL dynamically to update comprobante_nombre_archivo only if file uploaded
@@ -91,29 +440,182 @@ router.put('/admin/reservations/:id', upload.single('comprobante'), async (req, 
     sql += ` WHERE reservation_id = ?`;
     params.push(reservationId);
 
-    await db.runExecute(sql, params);
-    res.json({ success: true });
+    const result = await db.runExecute(sql, params);
+    
+    if (result.changes === 0) {
+      logger.warn('Intento de actualizar reserva inexistente', {
+        reservationId,
+        adminUser: req.user.username
+      });
+      
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Reserva no encontrada',
+        code: 'RESERVATION_NOT_FOUND'
+      });
+    }
+    
+    logger.info('Reserva administrativa actualizada exitosamente', {
+      reservationId,
+      changes: result.changes,
+      newStatus: status,
+      adminUser: req.user.username
+    });
+    
+    res.json({ 
+      success: true,
+      message: 'Reserva actualizada exitosamente',
+      data: {
+        reservation_id: reservationId,
+        changes: result.changes,
+        comprobante_updated: !!comprobante_nombre_archivo
+      }
+    });
   } catch (error) {
-    console.error('Error updating reservation:', error);
-    res.status(500).json({ success: false, message: 'Error updating reservation' });
+    logger.error('Error actualizando reserva administrativa', { 
+      error: error.message,
+      reservationId: req.params.id,
+      adminUser: req.user?.username
+    });
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error actualizando reserva',
+      code: 'UPDATE_ERROR'
+    });
   }
 });
 
-// DELETE /admin/reservations/:id - delete reservation
-router.delete('/admin/reservations/:id', async (req, res) => {
+// DELETE /:id - delete reservation
+router.delete('/:id', 
+  authenticateToken,
+  validateNumericId('id'),
+  logAdminActivity('delete_reservation'),
+  async (req, res) => {
   try {
     const reservationId = req.params.id;
+    
+    // Verificar que la reserva existe antes de eliminar
+    const checkSql = `SELECT reservation_id, status FROM Reservations WHERE reservation_id = ?`;
+    const existingReservation = await db.runQuery(checkSql, [reservationId]);
+    
+    if (existingReservation.length === 0) {
+      logger.warn('Intento de eliminar reserva inexistente', {
+        reservationId,
+        adminUser: req.user.username
+      });
+      
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Reserva no encontrada',
+        code: 'RESERVATION_NOT_FOUND'
+      });
+    }
+    
     const sql = `DELETE FROM Reservations WHERE reservation_id = ?`;
-    await db.runExecute(sql, [reservationId]);
-    res.json({ success: true });
+    const result = await db.runExecute(sql, [reservationId]);
+    
+    logger.warn('Reserva eliminada por administrador', {
+      reservationId,
+      previousStatus: existingReservation[0].status,
+      adminUser: req.user.username
+    });
+    
+    res.json({ 
+      success: true,
+      message: 'Reserva eliminada exitosamente',
+      data: {
+        reservation_id: reservationId,
+        changes: result.changes
+      }
+    });
   } catch (error) {
-    console.error('Error deleting reservation:', error);
-    res.status(500).json({ success: false, message: 'Error deleting reservation' });
+    logger.error('Error eliminando reserva administrativa', { 
+      error: error.message,
+      reservationId: req.params.id,
+      adminUser: req.user?.username
+    });
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error eliminando reserva',
+      code: 'DELETE_ERROR'
+    });
   }
 });
 
-// GET /admin/reservations/upcoming - get upcoming reservations (check-ins and check-outs in next 24-72h)
-router.get('/admin/reservations/upcoming', async (req, res) => {
+/**
+ * @swagger
+ * /admin/reservations/upcoming:
+ *   get:
+ *     tags: [Reservations]
+ *     summary: Obtener reservas próximas
+ *     description: Retorna las reservas con check-in o check-out en las próximas 24-72 horas
+ *     responses:
+ *       200:
+ *         description: Reservas próximas obtenidas exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     allOf:
+ *                       - $ref: '#/components/schemas/Reservation'
+ *                       - type: object
+ *                         properties:
+ *                           event_type:
+ *                             type: string
+ *                             enum: [check_in, check_out, other]
+ *                             example: check_in
+ *                             description: Tipo de evento próximo
+ *                           urgency:
+ *                             type: string
+ *                             enum: [today, tomorrow, later]
+ *                             example: today
+ *                             description: Urgencia del evento
+ *                 metadata:
+ *                   type: object
+ *                   properties:
+ *                     dateRange:
+ *                       type: object
+ *                       properties:
+ *                         from:
+ *                           type: string
+ *                           format: date
+ *                           example: 2024-08-04
+ *                         to:
+ *                           type: string
+ *                           format: date
+ *                           example: 2024-08-07
+ *                     total:
+ *                       type: integer
+ *                       example: 5
+ *       401:
+ *         description: Token no válido o no proporcionado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *     security:
+ *       - bearerAuth: []
+ */
+// GET /upcoming - get upcoming reservations (check-ins and check-outs in next 24-72h)
+router.get('/upcoming', 
+  authenticateToken,
+  logAdminActivity('list_upcoming_reservations'),
+  async (req, res) => {
   try {
     const now = new Date();
     const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -175,10 +677,34 @@ router.get('/admin/reservations/upcoming', async (req, res) => {
       tomorrow, tomorrow // final ordering tomorrow
     ]);
     
-    res.json(reservations);
+    logger.info('Reservas próximas consultadas', {
+      adminUser: req.user.username,
+      dateRange: `${today} to ${dayAfterTomorrow}`,
+      resultsCount: reservations.length
+    });
+    
+    res.json({
+      success: true,
+      data: reservations,
+      metadata: {
+        dateRange: {
+          from: today,
+          to: dayAfterTomorrow
+        },
+        total: reservations.length
+      }
+    });
   } catch (error) {
-    console.error('Error fetching upcoming reservations:', error);
-    res.status(500).json({ success: false, message: 'Error fetching upcoming reservations' });
+    logger.error('Error consultando reservas próximas', { 
+      error: error.message,
+      adminUser: req.user?.username
+    });
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error consultando reservas próximas',
+      code: 'UPCOMING_RESERVATIONS_ERROR'
+    });
   }
 });
 
