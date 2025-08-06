@@ -116,4 +116,19 @@ process.on('uncaughtException', (error) => {
   setTimeout(() => process.exit(1), 1000);
 });
 
+// Funciones helper para categorías específicas
+logger.security = (message, meta = {}) => {
+  logger.info(message, { ...meta, category: 'security' });
+};
+
+// Función helper para cache operations
+logger.cache = (message, meta = {}) => {
+  logger.debug(message, { ...meta, category: 'cache' });
+};
+
+// Función helper para tracking de performance
+logger.performance = (message, meta = {}) => {
+  logger.info(message, { ...meta, category: 'performance' });
+};
+
 module.exports = logger;

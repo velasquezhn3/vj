@@ -8,6 +8,7 @@
 const path = require('path');
 const { runQuery, runExecute } = require('../db');
 const logger = require('../config/logger');
+const cacheService = require('./cacheService');
 
 class CabinsDataService {
   constructor() {
@@ -50,50 +51,44 @@ class CabinsDataService {
   }
 
   /**
-   * Obtiene todas las cabañas activas
+   * Obtiene todas las cabañas activas con cache mejorado
    */
   async getAllCabins() {
+    const cacheKey = 'cabins:all';
+    
     try {
-      // Verificar cache
-      const now = Date.now();
-      if (this.cache.has('all_cabins') && (now - this.lastCacheUpdate) < this.CACHE_TTL) {
-        logger.debug('Retornando cabañas desde cache');
-        return this.cache.get('all_cabins');
-      }
+      // Intentar obtener del cache mejorado primero
+      return await cacheService.wrap(cacheKey, async () => {
+        const cabins = await runQuery(`
+          SELECT 
+            c.*,
+            GROUP_CONCAT(cp.url) as photos_urls
+          FROM Cabins c
+          LEFT JOIN CabinPhotos cp ON c.cabin_id = cp.cabin_id
+          WHERE (c.is_active IS NULL OR c.is_active = 1)
+          GROUP BY c.cabin_id
+          ORDER BY c.name
+        `);
 
-      const cabins = await runQuery(`
-        SELECT 
-          c.*,
-          GROUP_CONCAT(cp.url) as photos_urls
-        FROM Cabins c
-        LEFT JOIN CabinPhotos cp ON c.cabin_id = cp.cabin_id
-        WHERE (c.is_active IS NULL OR c.is_active = 1)
-        GROUP BY c.cabin_id
-        ORDER BY c.name
-      `);
+        // Procesar datos para formato compatible
+        const processedCabins = cabins.map(cabin => ({
+          id: cabin.cabin_id,
+          cabinId: cabin.cabin_id,
+          name: cabin.name,
+          capacity: cabin.capacity,
+          description: cabin.description || '',
+          amenities: [], // No hay amenities en el esquema actual
+          basePrice: cabin.base_price || cabin.price || 0,
+          pricePerAdditionalPerson: cabin.price_per_additional_person || 0,
+          photos: cabin.photos ? cabin.photos.split(',') : (cabin.photos_urls ? cabin.photos_urls.split(',') : []),
+          isActive: cabin.is_active !== 0,
+          createdAt: cabin.created_at,
+          updatedAt: cabin.updated_at
+        }));
 
-      // Procesar datos para formato compatible
-      const processedCabins = cabins.map(cabin => ({
-        id: cabin.cabin_id,
-        cabinId: cabin.cabin_id,
-        name: cabin.name,
-        capacity: cabin.capacity,
-        description: cabin.description || '',
-        amenities: [], // No hay amenities en el esquema actual
-        basePrice: cabin.base_price || cabin.price || 0,
-        pricePerAdditionalPerson: cabin.price_per_additional_person || 0,
-        photos: cabin.photos ? cabin.photos.split(',') : (cabin.photos_urls ? cabin.photos_urls.split(',') : []),
-        isActive: cabin.is_active !== 0,
-        createdAt: cabin.created_at,
-        updatedAt: cabin.updated_at
-      }));
-
-      // Actualizar cache
-      this.cache.set('all_cabins', processedCabins);
-      this.lastCacheUpdate = now;
-
-      logger.debug(`Obtenidas ${processedCabins.length} cabañas desde BD`);
-      return processedCabins;
+        logger.debug(`Obtenidas ${processedCabins.length} cabañas desde BD`);
+        return processedCabins;
+      });
 
     } catch (error) {
       logger.error('Error obteniendo cabañas:', error);
@@ -299,12 +294,17 @@ class CabinsDataService {
   }
 
   /**
-   * Limpia el cache
+   * Limpia el cache mejorado y legacy
    */
   clearCache() {
+    // Limpiar cache legacy
     this.cache.clear();
     this.lastCacheUpdate = 0;
-    logger.debug('Cache de cabañas limpiado');
+    
+    // Limpiar cache mejorado por patrón
+    cacheService.deletePattern('cabins:');
+    
+    logger.debug('Cache de cabañas limpiado (legacy + mejorado)');
   }
 }
 
