@@ -708,4 +708,100 @@ router.get('/upcoming',
   }
 });
 
+// POST /calculate-price - calculate reservation price
+router.post('/calculate-price', 
+  authenticateToken,
+  sanitizeRequestData,
+  async (req, res) => {
+  try {
+    const { cabin_id, start_date, end_date } = req.body;
+    
+    if (!cabin_id || !start_date || !end_date) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'cabin_id, start_date y end_date son obligatorios' 
+      });
+    }
+    
+    // Get cabin info
+    const cabinQuery = 'SELECT * FROM Cabins WHERE cabin_id = ?';
+    const cabinResults = await db.runQuery(cabinQuery, [cabin_id]);
+    
+    if (cabinResults.length === 0) {
+      return res.status(404).json({ success: false, message: 'Cabaña no encontrada' });
+    }
+    
+    const cabin = cabinResults[0];
+    
+    try {
+      // Calculate price using the pricing service
+      const { calcularPrecioTotal } = require('../services/reservaPriceService');
+      
+      const startDate = new Date(start_date);
+      const endDate = new Date(end_date);
+      const nights = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+      
+      if (nights <= 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'La fecha de salida debe ser posterior a la fecha de entrada' 
+        });
+      }
+      
+      // Format date for pricing service
+      const startDateStr = startDate.toLocaleDateString('es-HN', {
+        day: '2-digit',
+        month: '2-digit', 
+        year: 'numeric'
+      });
+      
+      // Determine cabin type from name
+      let tipoCabana = '';
+      const cabinName = cabin.name.toLowerCase();
+      if (cabinName.includes('tortuga')) {
+        tipoCabana = 'tortuga';
+      } else if (cabinName.includes('delfín') || cabinName.includes('delfin')) {
+        tipoCabana = 'delfin';
+      } else if (cabinName.includes('tiburón') || cabinName.includes('tiburon')) {
+        tipoCabana = 'tiburon';
+      }
+      
+      const totalPrice = tipoCabana ? calcularPrecioTotal(tipoCabana, startDateStr, nights) : cabin.price * nights;
+      
+      logger.info('Precio calculado para reserva', {
+        cabinId: cabin_id,
+        cabinType: tipoCabana,
+        nights: nights,
+        totalPrice: totalPrice,
+        adminUser: req.user.username
+      });
+      
+      res.json({ 
+        success: true, 
+        data: {
+          total_price: totalPrice,
+          nights: nights,
+          price_per_night: Math.round(totalPrice / nights),
+          cabin_name: cabin.name,
+          cabin_type: tipoCabana
+        }
+      });
+      
+    } catch (priceError) {
+      logger.error('Error calculando precio', { 
+        error: priceError.message,
+        cabinId: cabin_id
+      });
+      res.status(500).json({ success: false, message: 'Error calculando precio' });
+    }
+    
+  } catch (error) {
+    logger.error('Error en endpoint de cálculo de precio', { 
+      error: error.message,
+      adminUser: req.user?.username
+    });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
+
 module.exports = router;

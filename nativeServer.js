@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 
-const PORT = 4000;
+const PORT = 3000;
 const JWT_SECRET = 'your-secret-key-here';
 
 // Conectar a la base de datos SQLite

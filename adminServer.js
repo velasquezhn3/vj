@@ -9,6 +9,8 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpecs = require('./config/swagger');
 
 // Importar middlewares de seguridad
+// Rutas de huéspedes (usuarios normales)
+const usersRoutes = require('./routes/users');
 const { helmetConfig, generalLimiter, securityLogger, sanitizeInput, attackDetection } = require('./middleware/security');
 const { authenticateToken, authorizeRole, rateLimitByUser } = require('./middleware/auth');
 const { advancedSecurityMiddleware, enhancedValidationHandler } = require('./middleware/advancedValidation');
@@ -51,12 +53,17 @@ app.use(helmetConfig);
 // Logging de seguridad
 app.use(securityLogger);
 
-// Rate limiting general
-app.use('/admin', generalLimiter);
+// Rate limiting general - DESACTIVADO PARA DESARROLLO
+// app.use('/admin', generalLimiter);
 
 // CORS configurado
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  origin: [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -78,8 +85,11 @@ app.use(attackDetection);
 // Validación de seguridad avanzada (NUEVO)
 app.use(advancedSecurityMiddleware);
 
-// Rate limiting específico para usuarios autenticados en rutas admin
-app.use('/admin', rateLimitByUser(200, 15 * 60 * 1000)); // 200 requests por 15 min
+// Rate limiting específico para usuarios autenticados en rutas admin - DESACTIVADO PARA DESARROLLO
+
+// Rutas de huéspedes (usuarios normales, no admins)
+app.use('/users', usersRoutes);
+// app.use('/admin', rateLimitByUser(200, 15 * 60 * 1000)); // 200 requests por 15 min
 
 // Serve static files for simple frontend UI
 const path = require('path');
@@ -414,6 +424,42 @@ const adminCabinsController = require('./controllers/adminCabinsController');
 
 // Cabins routes (PROTEGIDAS)
 app.get('/admin/cabins', authenticateToken, adminCabinsController.getAllCabanas);
+
+// Get occupied dates for a specific cabin
+app.get('/admin/cabins/:id/occupied-dates', authenticateToken, validateId, async (req, res) => {
+  try {
+    const cabinId = parseInt(req.params.id);
+    
+    const query = `
+      SELECT start_date, end_date 
+      FROM Reservations 
+      WHERE cabin_id = ? AND status IN ('confirmada', 'confirmado', 'pendiente')
+    `;
+    
+    db.all(query, [cabinId], (err, rows) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ success: false, message: 'Error consultando fechas ocupadas' });
+      }
+      
+      const occupiedDates = [];
+      rows.forEach(reservation => {
+        const start = new Date(reservation.start_date);
+        const end = new Date(reservation.end_date);
+        
+        // Add all dates between start and end (inclusive)
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          occupiedDates.push(d.toISOString().split('T')[0]);
+        }
+      });
+      
+      res.json({ success: true, data: occupiedDates });
+    });
+  } catch (error) {
+    console.error('Error in occupied dates endpoint:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
 
 app.post('/admin/cabins', authenticateToken, upload.single('photo'), adminCabinsController.createCabana);
 
