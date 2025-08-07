@@ -420,6 +420,25 @@ app.put('/admin/users/:id', authenticateToken, authorizeRole('admin', 'superadmi
   }
 });
 
+// POST /admin/users/update-states - Actualizar estados de usuarios basado en reservas
+app.post('/admin/users/update-states', authenticateToken, authorizeRole('admin', 'superadmin'), async (req, res) => {
+  try {
+    const updatedCount = await usersService.updateUserStatesBasedOnReservations();
+    res.json({ 
+      success: true, 
+      message: `Estados actualizados para ${updatedCount} usuarios`,
+      updated: updatedCount
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error actualizando estados de usuarios:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error actualizando estados de usuarios',
+      error: 'INTERNAL_SERVER_ERROR' 
+    });
+  }
+});
+
 const adminCabinsController = require('./controllers/adminCabinsController');
 
 // Cabins routes (PROTEGIDAS)
@@ -478,110 +497,13 @@ const conversationStatesService = require('./services/conversationStatesService'
 const adminDashboardRoutes = require('./routes/adminDashboard');
 const adminCabinTypesRoutes = require('./routes/adminCabinTypes');
 const adminUsersRoutes = require('./routes/adminUsers');
+const adminActivitiesRoutes = require('./routes/adminActivities');
 
-// Dashboard, Cabin Types y Admin Users routes (PROTEGIDAS)
+// Dashboard, Cabin Types, Activities y Admin Users routes (PROTEGIDAS)
 app.use('/admin/dashboard', authenticateToken, adminDashboardRoutes);
 app.use('/admin/cabin-types', authenticateToken, adminCabinTypesRoutes);
+app.use('/admin/activities', authenticateToken, adminActivitiesRoutes);
 app.use('/admin/admin-users', authenticateToken, adminUsersRoutes);
-
-// Activities routes (PROTEGIDAS)
-const fs = require('fs');
-
-app.get('/admin/activities', authenticateToken, async (req, res) => {
-  try {
-    const dataPath = path.join(__dirname, 'data', 'actividades.json');
-    const rawData = fs.readFileSync(dataPath, 'utf-8');
-    const activities = JSON.parse(rawData);
-    res.json({
-      success: true,
-      data: activities
-    });
-  } catch (error) {
-    console.error('[ADMIN] Error reading activities JSON:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error cargando actividades',
-      error: 'INTERNAL_SERVER_ERROR' 
-    });
-  }
-});
-
-app.post('/admin/activities', authenticateToken, async (req, res) => {
-  try {
-    const activity = req.body;
-    const newId = await actividadesService.createActivity(activity);
-    if (newId) {
-      res.json({ 
-        success: true, 
-        activityId: newId,
-        message: 'Actividad creada exitosamente'
-      });
-    } else {
-      res.json({ 
-        success: false, 
-        message: 'Error creando actividad' 
-      });
-    }
-  } catch (error) {
-    console.error('[ADMIN] Error creando actividad:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error interno creando actividad',
-      error: 'INTERNAL_SERVER_ERROR' 
-    });
-  }
-});
-
-app.put('/admin/activities/:id', authenticateToken, validateId, async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const activity = req.body;
-    const success = await actividadesService.updateActivity(id, activity);
-    if (success) {
-      res.json({ 
-        success: true,
-        message: 'Actividad actualizada exitosamente'
-      });
-    } else {
-      res.json({ 
-        success: false, 
-        message: 'Error actualizando actividad' 
-      });
-    }
-  } catch (error) {
-    console.error('[ADMIN] Error actualizando actividad:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error interno actualizando actividad',
-      error: 'INTERNAL_SERVER_ERROR' 
-    });
-  }
-});
-
-app.delete('/admin/activities/:id', authenticateToken, validateId, async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const success = await actividadesService.deleteActivity(id);
-    if (success) {
-      res.json({ 
-        success: true,
-        message: 'Actividad eliminada exitosamente'
-      });
-    } else {
-      res.json({ 
-        success: false, 
-        message: 'Error eliminando actividad' 
-      });
-    }
-  } catch (error) {
-    console.error('[ADMIN] Error eliminando actividad:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error interno eliminando actividad',
-      error: 'INTERNAL_SERVER_ERROR' 
-    });
-  }
-});
 
 // Conversation States routes (PROTEGIDAS)
 app.get('/admin/conversation-states', authenticateToken, async (req, res) => {

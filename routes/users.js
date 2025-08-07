@@ -30,4 +30,37 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PUT /users/:id - Actualizar usuario
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone_number, role, is_active } = req.body;
+    
+    const updated = await usersService.updateUser(id, { name, phone_number, role, is_active });
+    if (updated) {
+      res.json({ success: true, message: 'Usuario actualizado exitosamente' });
+    } else {
+      res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    }
+  } catch (e) {
+    console.error('Error updating user:', e);
+    res.status(500).json({ success: false, message: 'Error al actualizar usuario' });
+  }
+});
+
+// POST /users/update-states - Actualizar estados de usuarios basado en reservas
+router.post('/update-states', async (req, res) => {
+  try {
+    const updatedCount = await usersService.updateUserStatesBasedOnReservations();
+    res.json({ 
+      success: true, 
+      message: `Estados actualizados para ${updatedCount} usuarios`,
+      updated: updatedCount
+    });
+  } catch (e) {
+    console.error('Error updating user states:', e);
+    res.status(500).json({ success: false, message: 'Error al actualizar estados de usuarios' });
+  }
+});
+
 module.exports = router;

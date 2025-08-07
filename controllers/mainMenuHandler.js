@@ -1,5 +1,5 @@
 const cabinsDataService = require('../services/cabinsDataService');
-const actividadesData = require('../data/actividades.json');
+const menuActivitiesService = require('../services/menuActivitiesService');
 const WeatherModule = require('../services/weatherService');
 const { sendShareExperienceInstructions } = require('../routes/shareExperience');
 // const { manejarPostReserva } = require('../routes/postReservaHandler'); // TEMPORALMENTE COMENTADO
@@ -12,6 +12,7 @@ const STATES = {
   LODGING: 'alojamientos',
   DATES: 'reservar_fechas',
   ACTIVITIES: 'actividades',
+  POST_ACTIVITY: 'post_actividad',
   SHARE_EXPERIENCE: 'compartir_experiencia',
   POST_RESERVA: 'post_reserva'
 };
@@ -35,22 +36,38 @@ async function generateDynamicMenu(itemType) {
     if (itemType === 'cabañas') {
       items = await cabinsDataService.getAllCabins();
     } else if (itemType === 'actividades') {
-      items = Object.values(actividadesData);
+      // Usar el servicio de base de datos para obtener actividades
+      items = await menuActivitiesService.loadActividades();
     }
     
     if (items.length === 0) {
       return `⚠️ No hay ${itemType} disponibles en este momento.`;
     }
 
-    const title = `🏠 *Nuestros alojamientos disponibles:*\n\n`;
+    let title = '';
+    if (itemType === 'cabañas') {
+      title = `🏠 *Nuestros alojamientos disponibles:*\n\n`;
+    } else if (itemType === 'actividades') {
+      title = `🎯 *Actividades y experiencias disponibles:*\n\n`;
+    }
+    
     const list = items.map((item, index) => {
       const name = item.name || item.nombre || `${itemType.slice(0, -1)} ${index + 1}`;
-      const capacity = item.capacity ? ` (${item.capacity} personas)` : '';
-      const price = item.basePrice && item.basePrice > 0 ? ` - $${item.basePrice}` : '';
-      return `${index + 1}. ${name}${capacity}${price}`;
+      
+      if (itemType === 'cabañas') {
+        const capacity = item.capacity ? ` (${item.capacity} personas)` : '';
+        const price = item.basePrice && item.basePrice > 0 ? ` - $${item.basePrice}` : '';
+        return `${index + 1}. ${name}${capacity}${price}`;
+      } else if (itemType === 'actividades') {
+        const category = item.categoria ? ` - ${item.categoria}` : '';
+        const duration = item.duracion ? ` (${item.duracion})` : '';
+        return `${index + 1}. ${name}${category}${duration}`;
+      }
+      
+      return `${index + 1}. ${name}`;
     }).join('\n');
     
-    const instructions = '\n\n🔍 *Selecciona el número para ver detalles completos y fotos.*';
+    const instructions = '\n\n🔍 *Selecciona el número para ver detalles completos y fotos.*\n0️⃣ *Menú principal*';
     
     return title + list + instructions;
   } catch (error) {
@@ -128,6 +145,7 @@ async function handleMainMenuOptions(bot, remitente, mensaje, establecerEstado) 
 
     case '6': // Preguntas Frecuentes
       await safeSend(bot, remitente, FAQ_CONTENT);
+      await safeSend(bot, remitente, 'Escribe *menu* o *1* para volver al menú principal');
       break;
 
     case '7': // Compartir experiencia

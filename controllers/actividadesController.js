@@ -1,42 +1,74 @@
-const { loadActividades } = require('../services/actividadesService');
+const { loadActividades } = require('../services/menuActivitiesService');
 const { safeSend } = require('../utils/utils'); // Asumiendo que safeSend está en utils
 
 // Función para generar detalles textuales de una actividad
 const generateActivityDetails = (actividad) => {
-  let detalles = `🏞️ *${actividad.nombre}*\n`;
-  detalles += `📍 Ubicación: ${actividad.ubicacion.direccion}\n`;
-  detalles += `⏰ Duración: ${actividad.duracion}\n`;
+  let detalles = `� *${actividad.nombre}*\n`;
   
-  detalles += `💰 Precio adulto: Lmps. ${actividad.precios?.adulto ?? 'N/A'}\n`;
-  detalles += `💰 Precio niño: Lmps. ${actividad.precios?.nino ?? 'N/A'}\n`;
-  
-  detalles += `📅 Horarios: ${actividad.horarios.general}\n`;
-  detalles += `📝 Descripción: ${actividad.descripcionCorta || actividad.descripcion}\n\n`;
-  
-  if (actividad.servicios?.length > 0) {
-    detalles += `Servicios:\n`;
-    detalles += actividad.servicios.map(servicio => `- ${servicio}`).join('\n') + '\n\n';
+  if (actividad.categoria) {
+    detalles += `� Categoría: ${actividad.categoria}\n`;
   }
   
-  if (actividad.recomendaciones?.queTraer?.length > 0) {
-    detalles += `Recomendaciones:\n`;
-    detalles += actividad.recomendaciones.queTraer.map(item => `- ${item}`).join('\n') + '\n\n';
+  if (actividad.ubicacion && actividad.ubicacion.direccion) {
+    detalles += `�📍 Ubicación: ${actividad.ubicacion.direccion}\n`;
   }
   
-  detalles += `Contacto:\n`;
-  detalles += `Teléfono: ${actividad.contacto.telefono}\n`;
-  detalles += `WhatsApp: ${actividad.contacto.whatsapp}\n`;
-  detalles += `Email: ${actividad.contacto.email}\n`;
-  
-  if (actividad.contacto.sitioWeb) {
-    detalles += `Sitio Web: ${actividad.contacto.sitioWeb}\n`;
+  if (actividad.duracion) {
+    detalles += `⏰ Duración: ${actividad.duracion}\n`;
   }
   
-  if (Object.keys(actividad.contacto.redesSociales).length > 0) {
-    detalles += `Redes Sociales:\n`;
-    detalles += Object.entries(actividad.contacto.redesSociales)
-      .map(([key, value]) => `- ${key}: ${value}`)
-      .join('\n') + '\n';
+  if (actividad.precios) {
+    if (actividad.precios.adulto) {
+      detalles += `💰 Precio adulto: L. ${actividad.precios.adulto}\n`;
+    }
+    if (actividad.precios.nino) {
+      detalles += `💰 Precio niño: L. ${actividad.precios.nino}\n`;
+    }
+  }
+  
+  if (actividad.horarios && actividad.horarios.general) {
+    detalles += `📅 Horarios: ${actividad.horarios.general}\n`;
+  }
+  
+  const descripcion = actividad.descripcionCorta || actividad.descripcion_corta || actividad.descripcion;
+  if (descripcion) {
+    detalles += `📝 Descripción: ${descripcion}\n\n`;
+  }
+  
+  if (actividad.servicios && Array.isArray(actividad.servicios) && actividad.servicios.length > 0) {
+    detalles += `✨ Servicios incluidos:\n`;
+    detalles += actividad.servicios.map(servicio => `• ${servicio}`).join('\n') + '\n\n';
+  }
+  
+  if (actividad.recomendaciones && actividad.recomendaciones.queTraer && Array.isArray(actividad.recomendaciones.queTraer) && actividad.recomendaciones.queTraer.length > 0) {
+    detalles += `🎒 Qué traer:\n`;
+    detalles += actividad.recomendaciones.queTraer.map(item => `• ${item}`).join('\n') + '\n\n';
+  }
+  
+  if (actividad.contacto) {
+    detalles += `📞 Contacto:\n`;
+    if (actividad.contacto.telefono) {
+      detalles += `• Teléfono: ${actividad.contacto.telefono}\n`;
+    }
+    if (actividad.contacto.whatsapp) {
+      detalles += `• WhatsApp: ${actividad.contacto.whatsapp}\n`;
+    }
+    if (actividad.contacto.email) {
+      detalles += `• Email: ${actividad.contacto.email}\n`;
+    }
+    if (actividad.contacto.sitioWeb) {
+      detalles += `• Sitio Web: ${actividad.contacto.sitioWeb}\n`;
+    }
+    
+    if (actividad.contacto.redesSociales && typeof actividad.contacto.redesSociales === 'object') {
+      const redes = Object.keys(actividad.contacto.redesSociales);
+      if (redes.length > 0) {
+        detalles += `• Redes Sociales:\n`;
+        detalles += Object.entries(actividad.contacto.redesSociales)
+          .map(([key, value]) => `  - ${key}: ${value}`)
+          .join('\n') + '\n';
+      }
+    }
   }
   
   return detalles;
@@ -67,7 +99,7 @@ const sendActivityPhotos = async (bot, remitente, multimedia) => {
 // Handler para flujo de actividades
 const flowActividadesHandler = async (ctx, { flowDynamic, endFlow }) => {
   try {
-    const actividades = loadActividades();
+    const actividades = await loadActividades();
     
     if (!actividades || actividades.length === 0) {
       await flowDynamic('⚠️ No hay actividades disponibles en este momento.');
@@ -113,9 +145,9 @@ const flowActividadesHandler = async (ctx, { flowDynamic, endFlow }) => {
 };
 
 // Enviar detalles de actividad específica
-const sendActividadDetails = async (bot, remitente, seleccion) => {
+const sendActividadDetails = async (bot, remitente, seleccion, establecerEstado = null) => {
   try {
-    const actividades = loadActividades();
+    const actividades = await loadActividades();
     
     if (!actividades || actividades.length === 0) {
       await safeSend(bot, remitente, '⚠️ No hay actividades disponibles en este momento.');
@@ -152,6 +184,15 @@ const sendActividadDetails = async (bot, remitente, seleccion) => {
     
     // Enviar fotos adicionales de la galería
     await sendActivityPhotos(bot, remitente, actividad.multimedia);
+    
+    // Enviar menú post-actividad después de las fotos
+    const menuPostActividad = `\n🔄 *¿Qué deseas hacer ahora?*\n1️⃣ Ver más actividades\n0️⃣ Menú principal`;
+    await safeSend(bot, remitente, menuPostActividad);
+    
+    // Establecer estado post-actividad si se proporciona la función
+    if (establecerEstado && typeof establecerEstado === 'function') {
+      await establecerEstado(remitente, 'post_actividad');
+    }
     
   } catch (error) {
     console.error('Error en sendActividadDetails:', error);

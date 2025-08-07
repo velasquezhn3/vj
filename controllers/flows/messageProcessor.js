@@ -43,6 +43,12 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
             return;
         }
 
+        // Verificar si el usuario escribió "menu" - regresar al menú principal en cualquier momento
+        if (mensajeTexto === 'menu' || mensajeTexto === '1') {
+            await enviarMenuPrincipal(bot, remitente);
+            return;
+        }
+
         const estadoData = await obtenerEstado(remitente);
         const estado = estadoData.estado;
         const datos = estadoData.datos;
@@ -107,7 +113,8 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
             MENU_PRINCIPAL: () => handleMenuState(bot, remitente, mensajeTexto, estado, establecerEstado),
             LISTA_CABAÑAS: () => handleMenuState(bot, remitente, mensajeTexto, estado, establecerEstado),
             DETALLE_CABAÑA: () => handleMenuState(bot, remitente, mensajeTexto, estado, establecerEstado),
-            actividades: () => handleActividadesState(bot, remitente, mensajeTexto),
+            actividades: () => handleActividadesState(bot, remitente, mensajeTexto, establecerEstado),
+            post_actividad: () => handlePostActividadState(bot, remitente, mensajeTexto, establecerEstado),
             // Flujo de reserva
             [ESTADOS_RESERVA.FECHAS]: () => handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje),
             [ESTADOS_RESERVA.CONFIRMAR_FECHAS]: () => handleReservaState(bot, remitente, mensajeTexto, estado, datos, mensaje),
@@ -415,6 +422,35 @@ async function procesarComprobantePostReserva(bot, remitente, mensajeObj, establ
         await bot.sendMessage(remitente, {
             text: 'Lo siento, ocurrió un error al procesar tu comprobante. Por favor intenta de nuevo.\n\nEscribe "menu" para ir al menú principal.'
         });
+    }
+}
+
+// Manejar estado post-actividad (después de mostrar una actividad)
+async function handlePostActividadState(bot, remitente, mensajeTexto, establecerEstado) {
+    const mensaje = mensajeTexto.trim();
+    
+    switch (mensaje) {
+        case '1':
+            // Ver más actividades - volver al menú de actividades
+            const { generateDynamicMenu } = require('../mainMenuHandler');
+            const menuActividades = await generateDynamicMenu('actividades');
+            await bot.sendMessage(remitente, { text: menuActividades });
+            await establecerEstado(remitente, 'actividades');
+            break;
+            
+        case '0':
+            // Menú principal
+            const { handleMainMenu } = require('../mainMenuHandler');
+            await handleMainMenu(bot, remitente, 'menu');
+            break;
+            
+        default:
+            await bot.sendMessage(remitente, {
+                text: '⚠️ Opción no válida.\n\n' +
+                      '🔹 Escribe *1* para ver más actividades\n' +
+                      '🔹 Escribe *0* para ir al menú principal'
+            });
+            break;
     }
 }
 

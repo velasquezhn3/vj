@@ -846,6 +846,66 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ========================================================================
+    // ACTIVITIES MANAGEMENT
+    // ========================================================================
+    if (path.startsWith('/admin/activities') && method === 'GET') {
+      const user = verifyToken(req.headers.authorization);
+      if (!user) {
+        sendJSON(res, { success: false, message: 'Token requerido' }, 401);
+        return;
+      }
+
+      try {
+        const activities = await dbQuery(`
+          SELECT 
+            activity_id,
+            activity_key,
+            nombre,
+            categoria,
+            subcategoria,
+            descripcion,
+            descripcion_corta,
+            ubicacion,
+            contacto,
+            horarios,
+            precios,
+            servicios,
+            dificultad,
+            duracion,
+            capacidad_maxima,
+            edad_minima,
+            idiomas,
+            recomendaciones,
+            disponibilidad,
+            multimedia,
+            calificacion,
+            certificaciones,
+            orden,
+            activo,
+            created_at,
+            updated_at
+          FROM Activities 
+          ORDER BY orden ASC, nombre ASC
+        `);
+        
+        console.log(`🎯 Actividades: ${activities.length} encontradas`);
+        
+        sendJSON(res, {
+          success: true,
+          data: activities,
+          total: activities.length
+        });
+      } catch (error) {
+        console.error('Error consultando actividades:', error);
+        sendJSON(res, {
+          success: false,
+          message: 'Error consultando actividades'
+        }, 500);
+      }
+      return;
+    }
+
+    // ========================================================================
     // ADMIN USERS MANAGEMENT
     // ========================================================================
     if (path.startsWith('/admin/admin-users') && method === 'GET') {
@@ -979,6 +1039,7 @@ server.listen(PORT, () => {
   console.log('  GET  /admin/users');
   console.log('  GET  /admin/cabins');
   console.log('  GET  /admin/cabin-types');
+  console.log('  GET  /admin/activities');
   console.log('  GET  /admin/admin-users');
   console.log('');
   console.log('🔧 Sin Express - Solo HTTP nativo');

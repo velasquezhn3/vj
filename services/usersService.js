@@ -55,9 +55,75 @@ const listUsers = async () => {
   }
 };
 
+const updateUserStatesBasedOnReservations = async () => {
+  try {
+    console.log('[UserService] Iniciando actualización de estados de usuarios...');
+    
+    // Obtener todos los usuarios y reservas
+    const users = await db.runQuery('SELECT * FROM Users');
+    const reservations = await db.runQuery('SELECT * FROM Reservations');
+    
+    console.log(`[UserService] Procesando ${users.length} usuarios y ${reservations.length} reservas`);
+    
+    let updatedCount = 0;
+    const currentDate = new Date();
+    console.log(`[UserService] Fecha actual: ${currentDate.toISOString().split('T')[0]}`);
+    
+    for (const user of users) {
+      // Buscar reservas del usuario
+      const userReservations = reservations.filter(res => 
+        res.user_id === user.user_id || res.user_id === user.user_id.toString()
+      );
+      
+      let newState = false; // Por defecto inactivo
+      
+      if (userReservations.length > 0) {
+        console.log(`[UserService] Usuario ${user.name} (${user.user_id}): ${userReservations.length} reservas`);
+        
+        // Verificar si tiene reservas activas o futuras
+        const hasActiveReservations = userReservations.some(res => {
+          const endDate = new Date(res.end_date);
+          // Estados válidos: confirmado, confirmada, pendiente, pending
+          const validStates = ['confirmado', 'confirmada', 'pendiente', 'pending', 'confirmed'];
+          const isActiveStatus = validStates.includes(res.status.toLowerCase());
+          const isFutureOrCurrent = endDate >= currentDate;
+          
+          console.log(`[UserService]   Reserva ${res.reservation_id}: ${res.status} | fin: ${res.end_date} | válido: ${isActiveStatus} | futuro: ${isFutureOrCurrent}`);
+          
+          return isActiveStatus && isFutureOrCurrent;
+        });
+        
+        newState = hasActiveReservations;
+        console.log(`[UserService] Usuario ${user.name}: resultado final = ${newState ? 'ACTIVO' : 'INACTIVO'}`);
+      } else {
+        console.log(`[UserService] Usuario ${user.name} (${user.user_id}): sin reservas`);
+      }
+      
+      // Actualizar solo si hay cambio
+      if (user.is_active !== (newState ? 1 : 0)) {
+        const updated = await updateUser(user.user_id, { is_active: newState });
+        if (updated) {
+          updatedCount++;
+          console.log(`[UserService] ✅ Usuario ${user.name} (${user.user_id}): ${user.is_active ? 'activo' : 'inactivo'} -> ${newState ? 'activo' : 'inactivo'}`);
+        }
+      } else {
+        console.log(`[UserService] ⚪ Usuario ${user.name}: sin cambios (ya ${newState ? 'activo' : 'inactivo'})`);
+      }
+    }
+    
+    console.log(`[UserService] Estados actualizados para ${updatedCount} usuarios`);
+    return updatedCount;
+    
+  } catch (e) {
+    console.error('Error updating user states:', e);
+    throw e;
+  }
+};
+
 module.exports = {
   getUserByPhone,
   createUser,
   updateUser,
-  listUsers
+  listUsers,
+  updateUserStatesBasedOnReservations
 };
