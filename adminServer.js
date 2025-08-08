@@ -17,6 +17,7 @@ const usersRoutes = require('./routes/users');
 const { helmetConfig, generalLimiter, securityLogger, sanitizeInput, attackDetection } = require('./middleware/security');
 const { authenticateToken, authorizeRole, rateLimitByUser } = require('./middleware/auth');
 const { advancedSecurityMiddleware, enhancedValidationHandler } = require('./middleware/advancedValidation');
+const SecurityValidator = require('./middleware/securityValidator');
 const { 
   validateUserCreation, 
   validateUserUpdate, 
@@ -37,6 +38,7 @@ const {
 } = require('./middleware/advancedValidation');
 
 const db = require('./db');
+const cacheService = require('./services/cacheService');
 const { runQuery, runExecute } = require('./db');
 const usersService = require('./services/usersService');
 const alojamientosService = require('./services/alojamientosService');
@@ -56,8 +58,12 @@ app.use(helmetConfig);
 // Logging de seguridad
 app.use(securityLogger);
 
-// Rate limiting general - DESACTIVADO PARA DESARROLLO
-// app.use('/admin', generalLimiter);
+// Rate limiting general - ACTIVADO para seguridad
+app.use('/admin', generalLimiter);
+
+// Rate limiting específico para login
+const { loginLimiter } = require('./middleware/security');
+app.use('/auth', loginLimiter);
 
 // CORS configurado
 app.use(cors({
@@ -316,10 +322,29 @@ if (process.env.NODE_ENV === 'development') {
  *     security:
  *       - bearerAuth: []
  */
-// Users routes (PROTEGIDAS)
-app.get('/admin/users', authenticateToken, validatePagination, validateSearchQuery, async (req, res) => {
+// Users routes (PROTEGIDAS CON VALIDACIÓN DE SEGURIDAD)
+app.get('/admin/users', 
+  authenticateToken, 
+  SecurityValidator.validateQuery(SecurityValidator.schemas.pagination),
+  validatePagination, 
+  validateSearchQuery, 
+  async (req, res) => {
   try {
-    const users = await usersService.listUsers();
+    // Cache key único basado en query parameters
+    const cacheKey = `users_${JSON.stringify(req.query)}`;
+    
+    // Intentar obtener desde cache primero
+    let users = cacheService.get(cacheKey);
+    
+    if (!users) {
+      // Si no está en cache, obtener de DB y cachear
+      users = await usersService.listUsers();
+      cacheService.set(cacheKey, users, 300); // Cache por 5 minutos
+      console.log('[CACHE] Users cacheados:', cacheKey);
+    } else {
+      console.log('[CACHE] Users obtenidos desde cache:', cacheKey);
+    }
+    
     res.json(users);
   } catch (error) {
     console.error('[ADMIN] Error obteniendo usuarios:', error);
@@ -963,6 +988,15 @@ app.post('/admin/backup/restore', authenticateToken, async (req, res) => {
     });
   }
 });
+
+// ============================================================================
+// MIDDLEWARE GLOBAL DE MANEJO DE ERRORES PARA PRODUCCIÓN
+// ============================================================================
+const GlobalErrorHandler = require('./middleware/globalErrorHandler');
+const errorHandler = new GlobalErrorHandler();
+
+// Middleware de manejo de errores (debe ir AL FINAL)
+app.use(errorHandler.expressErrorHandler());
 
 app.listen(PORT, () => {
   console.log(`Admin server running at http://localhost:${PORT}`);

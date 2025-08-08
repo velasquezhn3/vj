@@ -161,20 +161,15 @@ async function startBot() {
           
           console.log(`📩 Mensaje recibido de ${remitente}: ${texto || messageType}`);
           
-          // 🚀 TEMPORAL: Desactivar colas y procesar directamente
-          console.warn('🔧 MODO DEBUG: Procesando directamente sin colas');
-          await procesarMensaje(bot, remitente, texto, msg);
-          
-          /*
-          // 🚀 NUEVO: Usar sistema de colas en lugar de procesamiento directo
+          // 🚀 ACTIVADO: Usar sistema de colas para procesamiento robusto
           if (queueManager) {
+            console.log('� Enviando mensaje a cola de procesamiento');
             await queueManager.addMessageToQueue(bot, remitente, texto, msg, messageType);
           } else {
             // Fallback: procesamiento directo si las colas no están disponibles
             console.warn('⚠️ Colas no disponibles, procesando directamente');
             await procesarMensaje(bot, remitente, texto, msg);
           }
-          */
         }
       } catch (processingError) {
         console.error('❌ Error procesando mensaje:', processingError);
