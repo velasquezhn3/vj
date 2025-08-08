@@ -4,8 +4,24 @@
  */
 
 const express = require('express');
+const cors = require('cors');
 const app = express();
 const PORT = 4001;
+
+// Configurar CORS para permitir conexiones desde el frontend React
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+    'http://localhost:3002',
+    'http://127.0.0.1:3002'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Middleware
 app.use(express.json());
@@ -312,7 +328,7 @@ app.get('/api/status', (req, res) => {
 });
 
 // Iniciar servidor
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log('🎯 ===================================');
   console.log('📊 BOT VJ DASHBOARD INICIADO');
   console.log('🌐 URL: http://localhost:' + PORT);
@@ -321,11 +337,49 @@ app.listen(PORT, () => {
   console.log('🎯 ===================================');
 });
 
-// Manejo de errores
+// Configurar keepalive para el servidor
+server.keepAliveTimeout = 120000; // 2 minutos
+server.headersTimeout = 120000; // 2 minutos
+
+// Manejo de errores del servidor
+server.on('error', (error) => {
+  console.error('❌ Error del servidor:', error.message);
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Puerto ${PORT} ya está en uso. Cerrando...`);
+    process.exit(1);
+  }
+});
+
+// Manejo de cierre limpio
+process.on('SIGINT', () => {
+  console.log('\n🛑 Cerrando Dashboard Simple...');
+  server.close(() => {
+    console.log('✅ Dashboard Simple cerrado correctamente');
+    process.exit(0);
+  });
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Terminando Dashboard Simple...');
+  server.close(() => {
+    console.log('✅ Dashboard Simple terminado correctamente');
+    process.exit(0);
+  });
+});
+
+// Manejo de errores globales
 process.on('uncaughtException', (error) => {
   console.error('❌ Error no capturado:', error.message);
+  console.error('Stack:', error.stack);
+  // No cerrar el proceso para mantener el dashboard funcionando
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Promesa rechazada:', reason);
+  // No cerrar el proceso para mantener el dashboard funcionando
 });
+
+// Heartbeat cada 30 segundos
+setInterval(() => {
+  console.log(`💓 Dashboard Simple activo - ${new Date().toLocaleString()}`);
+}, 30000);

@@ -170,23 +170,8 @@ const reenviarComprobanteAlGrupo = async (bot, mensaje, datos, reservaInfo = nul
       await safeSend(bot, GRUPO_JID, reservaInfo);
     }
 
-    // Enviar comando /reservado con id de reserva en mensaje aparte
-    let idReserva = null;
-    if (reservaInfo && reservaInfo.includes('ID de reserva:')) {
-      const match = reservaInfo.match(/ID de reserva:\s*(\d+)/);
-      if (match) {
-        idReserva = match[1];
-      }
-    } else if (datos && datos.reservation_id) {
-      idReserva = datos.reservation_id;
-    } else if (datos && datos._id) {
-      idReserva = datos._id;
-    }
-
-    if (idReserva) {
-      console.log(`[Grupo] Enviando comando /reservado ${idReserva}`);
-      await safeSend(bot, GRUPO_JID, `/reservado ${idReserva}`);
-    }
+    // ⚠️ COMANDO /reservado SE MANEJA AHORA EN messageProcessor.js
+    // No enviar comando desde aquí para evitar duplicados
 
     return rutaRelativa;
   } catch (error) {

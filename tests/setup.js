@@ -16,30 +16,32 @@ global.console = {
 
 // Mock básico para sqlite3
 jest.mock('sqlite3', () => ({
-  Database: jest.fn().mockImplementation(() => ({
-    close: jest.fn((callback) => callback && callback()),
-    run: jest.fn((sql, params, callback) => {
-      if (typeof params === 'function') {
-        params(null);
-      } else if (callback) {
-        callback(null);
-      }
-    }),
-    get: jest.fn((sql, params, callback) => {
-      if (typeof params === 'function') {
-        params(null, {});
-      } else if (callback) {
-        callback(null, {});
-      }
-    }),
-    all: jest.fn((sql, params, callback) => {
-      if (typeof params === 'function') {
-        params(null, []);
-      } else if (callback) {
-        callback(null, []);
-      }
-    })
-  }))
+  verbose: () => ({
+    Database: jest.fn().mockImplementation(() => ({
+      close: jest.fn((callback) => callback && callback()),
+      run: jest.fn((sql, params, callback) => {
+        if (typeof params === 'function') {
+          params(null);
+        } else if (callback) {
+          callback(null);
+        }
+      }),
+      get: jest.fn((sql, params, callback) => {
+        if (typeof params === 'function') {
+          params(null, {});
+        } else if (callback) {
+          callback(null, {});
+        }
+      }),
+      all: jest.fn((sql, params, callback) => {
+        if (typeof params === 'function') {
+          params(null, []);
+        } else if (callback) {
+          callback(null, []);
+        }
+      })
+    }))
+  })
 }));
 
 // Mock para variables de entorno críticas

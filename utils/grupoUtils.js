@@ -20,8 +20,10 @@ async function enviarReservaAlGrupo(bot, reserva) {
 "❌ Usa /cancelar " + reserva.reservation_id + " para rechazar\n";
 
 
+    // Enviar resumen de la reserva
     const textMessage = await bot.sendMessage(GRUPO_JID, { text: resumen });
 
+    // Si hay comprobante, enviarlo como archivo adjunto
     if (reserva.comprobante_nombre_archivo) {
       const rutaAbsoluta = path.join(__dirname, '../admin-frontend/public/comprobantes', reserva.comprobante_nombre_archivo);
 
@@ -34,12 +36,12 @@ async function enviarReservaAlGrupo(bot, reserva) {
             document: buffer,
             fileName: path.basename(rutaAbsoluta),
             mimetype: 'application/pdf',
-            caption: "📎 Comprobante de pago - Reserva " + reserva._id
+            caption: "📎 Comprobante de pago - Reserva " + reserva.reservation_id
           });
         } else if (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.gif') {
           await bot.sendMessage(GRUPO_JID, {
             image: buffer,
-            caption: "📎 Comprobante de pago - Reserva " + reserva._id
+            caption: "📎 Comprobante de pago - Reserva " + reserva.reservation_id
           });
         } else {
           console.warn("[Grupo] Tipo de archivo no soportado para comprobante: " + ext);
@@ -47,17 +49,30 @@ async function enviarReservaAlGrupo(bot, reserva) {
       } else {
         console.warn("[Grupo] Archivo no encontrado: " + rutaAbsoluta);
       }
-
-      // Send separate message with /reservado command and reservation id after sending comprobante
-      await bot.sendMessage(GRUPO_JID, { text: "/reservado " + reserva.reservation_id });
     }
 
-    // Send separate message with /reservado command and reservation id
-    // await bot.sendMessage(GRUPO_JID, { text: "/reservado " + reserva.reservation_id });
-
-    await Reserva.findByIdAndUpdate(reserva._id, {
-      grupoMessageId: textMessage.key.id
+    // SIEMPRE enviar comando /reservado en mensaje separado (para copy/paste fácil)
+    await bot.sendMessage(GRUPO_JID, { 
+      text: `/reservado ${reserva.reservation_id}`
     });
+
+    /* MENSAJE CON INSTRUCCIONES ELIMINADO por solicitud del usuario
+    await bot.sendMessage(GRUPO_JID, { 
+      text: `🔄 *COMANDO LISTO PARA COPIAR:*\n\n\`/reservado ${reserva.reservation_id}\`\n\n📋 *Instrucciones:*\n• Copia el comando de arriba\n• Pégalo en el chat para confirmar la reserva\n• O usa /cancelar ${reserva.reservation_id} para rechazar`,
+    });
+    */
+
+    // Actualizar mensaje de grupo en la base de datos (si está disponible)
+    try {
+      if (Reserva && typeof Reserva.findByIdAndUpdate === 'function' && reserva._id) {
+        await Reserva.findByIdAndUpdate(reserva._id, {
+          grupoMessageId: textMessage.key.id
+        });
+      }
+    } catch (updateError) {
+      console.warn('[Grupo] No se pudo actualizar mensaje en DB (normal en tests):', updateError.message);
+    }
+    
   } catch (error) {
     console.error('Error enviando reserva al grupo:', error);
   }

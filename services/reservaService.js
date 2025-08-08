@@ -290,6 +290,36 @@ async function findUserByPhone(phoneNumber) {
     }
 }
 
+/**
+ * Check if user has a pending reservation created in the last 2 minutes
+ * @param {string} phoneNumber - phone number to check
+ * @returns {Promise<object|null>} recent pending reservation or null
+ */
+async function checkRecentPendingReservation(phoneNumber) {
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (!normalizedPhone) {
+        return null;
+    }
+
+    try {
+        const sql = `
+            SELECT r.reservation_id, r.created_at, r.status
+            FROM Reservations r
+            JOIN Users u ON r.user_id = u.user_id
+            WHERE u.phone_number = ? 
+            AND r.status = 'pendiente'
+            AND datetime('now') < datetime(r.created_at, '+2 minutes')
+            ORDER BY r.created_at DESC
+            LIMIT 1
+        `;
+        const rows = await runQuery(sql, [normalizedPhone]);
+        return rows.length > 0 ? rows[0] : null;
+    } catch (error) {
+        logger.error('Error checking recent pending reservation:', error);
+        return null;
+    }
+}
+
 module.exports = {
     createReservationWithUser,
     normalizePhoneNumber,
@@ -300,5 +330,6 @@ module.exports = {
     updateReservationPrice,
     getUserByPhone,
     getReservationById,
-    findUserByPhone
+    findUserByPhone,
+    checkRecentPendingReservation
 };

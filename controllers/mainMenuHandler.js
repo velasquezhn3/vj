@@ -4,12 +4,13 @@ const WeatherModule = require('../services/weatherService');
 const { sendShareExperienceInstructions } = require('../routes/shareExperience');
 // const { manejarPostReserva } = require('../routes/postReservaHandler'); // TEMPORALMENTE COMENTADO
 const { extraerTelefono } = require('../utils/telefonoUtils');
+const { sendMessageWithDelay } = require('../utils/messageDelayUtils');
 
 const weatherModule = new WeatherModule('5a9417f67be807a6e981ec69173924ac');
 
 // Estados constantes
 const STATES = {
-  LODGING: 'alojamientos',
+  LODGING: 'LISTA_CABAÑAS',  // Cambiado de 'alojamientos' a 'LISTA_CABAÑAS' para consistencia
   DATES: 'reservar_fechas',
   ACTIVITIES: 'actividades',
   POST_ACTIVITY: 'post_actividad',
@@ -17,10 +18,10 @@ const STATES = {
   POST_RESERVA: 'post_reserva'
 };
 
-// Helper para enviar mensajes con manejo de errores
+// Helper para enviar mensajes con manejo de errores y delay aleatorio
 async function safeSend(bot, recipient, text) {
   try {
-    await bot.sendMessage(recipient, { text });
+    await sendMessageWithDelay(bot, recipient, { text });
     return true;
   } catch (error) {
     console.error(`Error al enviar mensaje a ${recipient}:`, error);
@@ -189,7 +190,7 @@ async function manejarPostReserva(bot, remitente, mensaje, establecerEstado) {
     console.log('### RESERVA ENCONTRADA:', reserva);
     
     if (!reserva) {
-      await bot.sendMessage(remitente, {
+      await sendMessageWithDelay(bot, remitente, {
         text: '⚠️ No encontramos reservas activas o pendientes asociadas a este número.\n\n' +
               '🔹 Solo pueden acceder usuarios con:\n' +
               '   • Reservas activas (confirmadas)\n' +
@@ -223,7 +224,7 @@ async function manejarPostReserva(bot, remitente, mensaje, establecerEstado) {
       menuTexto += 'Responde con el número de tu opción.\n\nEscribe "menu" para ir al menú principal.';
       
       console.log('### ENVIANDO MENÚ ###');
-      await bot.sendMessage(remitente, { text: menuTexto });
+      await sendMessageWithDelay(bot, remitente, { text: menuTexto });
       await establecerEstado(remitente, 'post_reserva_menu', { reserva });
       console.log('### MENÚ ENVIADO Y ESTADO ESTABLECIDO ###');
       return;
@@ -231,7 +232,7 @@ async function manejarPostReserva(bot, remitente, mensaje, establecerEstado) {
     
   } catch (error) {
     console.error('Error en manejarPostReserva:', error);
-    await bot.sendMessage(remitente, {
+    await sendMessageWithDelay(bot, remitente, {
       text: 'Lo siento, ocurrió un error. Por favor intenta de nuevo más tarde.\n\nEscribe "menu" para ir al menú principal.'
     });
   }

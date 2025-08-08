@@ -5,13 +5,27 @@ const fs = require('fs');
 const path = require('path');
 const { procesarMensaje } = require('./messageHandler');
 const reservaCleanupService = require('../services/reservaCleanupService');
+const { getQueueManager } = require('../services/whatsappQueueService');
 
 // Variables globales para control de reconexión
 let reconnectAttempts = 0;
 let isReconnecting = false;
+let queueManager = null;
 
 async function startBot() {
   try {
+    // Inicializar sistema de colas
+    console.log('🚀 Inicializando sistema de colas...');
+    queueManager = getQueueManager();
+    
+    try {
+      await queueManager.init();
+      console.log('✅ Sistema de colas iniciado correctamente');
+    } catch (queueError) {
+      console.error('⚠️ Error inicializando colas, continuando sin colas:', queueError.message);
+      queueManager = null; // Asegurar que no se use si falló
+    }
+    
     // Crear directorios necesarios si no existen (siempre dentro de vj)
     const dataDir = path.join(__dirname, '..', 'data');
     const sessionDir = path.join(dataDir, 'session');
@@ -84,6 +98,12 @@ async function startBot() {
       if (update.connection === 'open') {
         reconnectAttempts = 0;
         console.log('✅ Conexión establecida con WhatsApp');
+        
+        // Configurar el bot en el sistema de colas
+        if (queueManager) {
+          queueManager.setBotInstance(bot);
+          console.log('🤖 Bot configurado en el sistema de colas');
+        }
       }
       
       // Manejo de desconexiones
@@ -140,7 +160,21 @@ async function startBot() {
           // Agregar aquí otros tipos de mensaje si son necesarios
           
           console.log(`📩 Mensaje recibido de ${remitente}: ${texto || messageType}`);
+          
+          // 🚀 TEMPORAL: Desactivar colas y procesar directamente
+          console.warn('🔧 MODO DEBUG: Procesando directamente sin colas');
           await procesarMensaje(bot, remitente, texto, msg);
+          
+          /*
+          // 🚀 NUEVO: Usar sistema de colas en lugar de procesamiento directo
+          if (queueManager) {
+            await queueManager.addMessageToQueue(bot, remitente, texto, msg, messageType);
+          } else {
+            // Fallback: procesamiento directo si las colas no están disponibles
+            console.warn('⚠️ Colas no disponibles, procesando directamente');
+            await procesarMensaje(bot, remitente, texto, msg);
+          }
+          */
         }
       } catch (processingError) {
         console.error('❌ Error procesando mensaje:', processingError);

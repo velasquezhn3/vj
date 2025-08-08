@@ -14,7 +14,27 @@ const alojamientosService = require('../../services/alojamientosService');
 
 const { handleGroupCommand } = require('./groupCommandHandlers');
 const { extractMessageText } = require('./messageProcessorUtils');
+const { sendMessageWithDelay } = require('../../utils/messageDelayUtils');
 // const { manejarPostReserva, manejarNoReserva, procesarComprobantePostReserva } = require('../../routes/postReservaHandler'); // TEMPORALMENTE COMENTADO
+
+/**
+ * DEPRECATED: Usar sendMessageWithDelay de messageDelayUtils en su lugar
+ * Genera un delay aleatorio entre 4 y 15 segundos para simular respuesta humana
+ * y evitar bloqueos por envío masivo
+ * @returns {Promise} Promise que se resuelve después del delay
+ */
+async function randomDelay() {
+    const minDelay = 4000; // 4 segundos
+    const maxDelay = 15000; // 15 segundos
+    const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    
+    logger.info(`⏳ Aplicando delay aleatorio de ${(delay/1000).toFixed(1)} segundos para evitar bloqueos`);
+    
+    return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+// NOTA: La función sendMessageWithDelay ya está importada de messageDelayUtils
+// Esta función local duplicada ha sido eliminada para evitar conflictos
 
 async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
     // Validación básica de remitente
@@ -44,7 +64,7 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
         }
 
         // Verificar si el usuario escribió "menu" - regresar al menú principal en cualquier momento
-        if (mensajeTexto === 'menu' || mensajeTexto === '1') {
+        if (mensajeTexto === 'menu') {
             await enviarMenuPrincipal(bot, remitente);
             return;
         }
@@ -84,22 +104,74 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
             
             await reenviarComprobanteAlGrupo(bot, mensajeObj, datosCliente, infoReserva);
 
-            // Enviar comando /reservado con id de reserva en mensaje aparte
+            // ✅ ENVIAR COMANDO /reservado MEJORADO
             try {
                 let idReserva = null;
+                
+                // 1. Buscar por ID en los datos del estado
                 if (datos && (datos.reservation_id || datos._id)) {
                     idReserva = datos.reservation_id || datos._id;
-                } else if (datos && datos.telefono) {
-                    // Buscar reserva por teléfono
-                    const reserva = await alojamientosService.getReservationByPhone(datos.telefono);
-                    if (reserva && (reserva.reservation_id || reserva._id)) {
-                        idReserva = reserva.reservation_id || reserva._id;
+                    console.log(`[DEBUG] ID encontrado en datos del estado: ${idReserva}`);
+                } 
+                // 2. Buscar por teléfono en los datos del estado
+                else if (datos && datos.telefono) {
+                    const { normalizePhoneNumber } = require('../../services/reservaService');
+                    const phoneNormalized = normalizePhoneNumber(datos.telefono);
+                    console.log(`[DEBUG] Buscando reserva reciente para teléfono: ${phoneNormalized}`);
+                    
+                    // Buscar la reserva MÁS RECIENTE con estado 'pendiente' del usuario
+                    const { runQuery } = require('../../db');
+                    const sql = `
+                        SELECT r.reservation_id 
+                        FROM Reservations r
+                        JOIN Users u ON r.user_id = u.user_id
+                        WHERE u.phone_number = ? 
+                        AND r.status = 'pendiente'
+                        ORDER BY r.created_at DESC
+                        LIMIT 1
+                    `;
+                    const rows = await runQuery(sql, [phoneNormalized]);
+                    
+                    if (rows && rows.length > 0) {
+                        idReserva = rows[0].reservation_id;
+                        console.log(`[DEBUG] ID encontrado por teléfono: ${idReserva}`);
+                    } else {
+                        console.log(`[DEBUG] No se encontró reserva pendiente para ${phoneNormalized}`);
                     }
                 }
+                // 3. Buscar por el número del remitente directamente
+                else {
+                    const { normalizePhoneNumber } = require('../../services/reservaService');
+                    const phoneFromSender = normalizePhoneNumber(remitente.replace('@s.whatsapp.net', ''));
+                    console.log(`[DEBUG] Buscando reserva reciente para remitente: ${phoneFromSender}`);
+                    
+                    const { runQuery } = require('../../db');
+                    const sql = `
+                        SELECT r.reservation_id 
+                        FROM Reservations r
+                        JOIN Users u ON r.user_id = u.user_id
+                        WHERE u.phone_number = ? 
+                        AND r.status = 'pendiente'
+                        ORDER BY r.created_at DESC
+                        LIMIT 1
+                    `;
+                    const rows = await runQuery(sql, [phoneFromSender]);
+                    
+                    if (rows && rows.length > 0) {
+                        idReserva = rows[0].reservation_id;
+                        console.log(`[DEBUG] ID encontrado por remitente: ${idReserva}`);
+                    } else {
+                        console.log(`[DEBUG] No se encontró reserva pendiente para remitente ${phoneFromSender}`);
+                    }
+                }
+                
+                // ✅ Enviar SOLO el comando /reservado sin texto adicional
                 if (idReserva) {
-                    console.log(`[DEBUG] Enviando comando /reservado ${idReserva}`);
+                    console.log(`[DEBUG] Enviando comando /reservado ${idReserva} al grupo`);
                     await bot.sendMessage(GRUPO_JID, { text: `/reservado ${idReserva}` });
-                    console.log(`[DEBUG] Comando /reservado enviado correctamente`);
+                    console.log(`[DEBUG] ✅ Comando /reservado ${idReserva} enviado exitosamente`);
+                } else {
+                    console.log(`[ERROR] No se pudo determinar el ID de la reserva`);
                 }
             } catch (error) {
                 console.error(`[ERROR] Error enviando comando /reservado: ${error.message}`);
@@ -138,7 +210,7 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
                 } else if (mensajeTexto === 'menu') {
                     return enviarMenuPrincipal(bot, remitente);
                 } else {
-                    return bot.sendMessage(remitente, {
+                    return sendMessageWithDelay(bot, remitente, {
                         text: '⚠️ Por favor envía una imagen o documento con el comprobante de pago.\n\nEscribe "menu" para cancelar.'
                     });
                 }
@@ -149,7 +221,7 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
                 } else if (mensajeTexto === '2' || mensajeTexto === 'menu') {
                     return enviarMenuPrincipal(bot, remitente);
                 } else {
-                    return bot.sendMessage(remitente, {
+                    return sendMessageWithDelay(bot, remitente, {
                         text: 'Por favor responde con 1, 2 o "menu".'
                     });
                 }
@@ -162,7 +234,7 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
                         const { runQuery } = require('../../db');
                         await runQuery('UPDATE Reservations SET status = ? WHERE reservation_id = ?', ['cancelada', reserva.reservation_id]);
                         
-                        await bot.sendMessage(remitente, {
+                        await sendMessageWithDelay(bot, remitente, {
                             text: '✅ *RESERVA CANCELADA*\n\n' +
                                   `📅 Reserva ${reserva.reservation_id} ha sido cancelada exitosamente.\n\n` +
                                   '💰 Si realizaste algún pago, nos pondremos en contacto contigo para coordinar el reembolso según nuestras políticas.\n\n' +
@@ -172,20 +244,20 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
                         await establecerEstado(remitente, null);
                     } catch (error) {
                         console.error('Error cancelando reserva:', error);
-                        await bot.sendMessage(remitente, {
+                        await sendMessageWithDelay(bot, remitente, {
                             text: '❌ Error al cancelar la reserva. Por favor contacta con un agente.\n\nEscribe "menu" para ir al menú principal.'
                         });
                     }
                 } else if (mensajeTexto === '2') {
                     // No cancelar
-                    await bot.sendMessage(remitente, {
+                    await sendMessageWithDelay(bot, remitente, {
                         text: '✅ *RESERVA MANTENIDA*\n\n' +
                               'Tu reserva se mantiene activa.\n\n' +
                               'Escribe "menu" para volver al menú principal.'
                     });
                     await establecerEstado(remitente, null);
                 } else {
-                    await bot.sendMessage(remitente, {
+                    await sendMessageWithDelay(bot, remitente, {
                         text: '❌ Opción no válida.\n\nPor favor responde:\n1. Sí, cancelar reserva\n2. No, mantener reserva\n\nEscribe "menu" para ir al menú principal.'
                     });
                 }
@@ -202,14 +274,14 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
             if (estadosAPreservar.includes(estado)) {
                 // Para estados críticos, solo dar una advertencia pero mantener el estado
                 logger.warn(`Mensaje no válido en estado crítico: ${estado}`, { userId: remitente });
-                await bot.sendMessage(remitente, {
+                await sendMessageWithDelay(bot, remitente, {
                     text: '⏳ Tu reserva está en proceso. Por favor espera la confirmación del administrador.'
                 });
                 return; // No cambiar el estado
             } else {
                 // Si el estado no es manejado, muestra advertencia y regresa al menú principal
                 logger.warn(`Estado no manejado: ${estado}`, { userId: remitente });
-                await bot.sendMessage(remitente, {
+                await sendMessageWithDelay(bot, remitente, {
                     text: '⚠️ Estado no reconocido. Te regreso al menú principal.'
                 });
                 await establecerEstado(remitente, 'MENU_PRINCIPAL', {});
@@ -228,12 +300,12 @@ async function procesarMensaje(bot, remitente, mensaje, mensajeObj) {
             const estadosAPreservar = ['esperando_pago', 'ESPERANDO_PAGO', 'esperando_confirmacion', 'ESPERANDO_CONFIRMACION'];
             
             if (estadosAPreservar.includes(estadoActual.estado)) {
-                await bot.sendMessage(remitente, {
+                await sendMessageWithDelay(bot, remitente, {
                     text: '⚠️ Error temporal. Tu reserva sigue en proceso, no te preocupes.'
                 });
                 // No resetear el estado
             } else {
-                await bot.sendMessage(remitente, {
+                await sendMessageWithDelay(bot, remitente, {
                     text: '⚠️ Error procesando tu solicitud. Intenta nuevamente.'
                 });
                 establecerEstado(remitente, 'MENU_PRINCIPAL');
@@ -256,7 +328,7 @@ async function manejarPostReservaMenu(bot, remitente, mensaje, establecerEstado,
     
     const reserva = datos?.reserva;
     if (!reserva) {
-        await bot.sendMessage(remitente, {
+        await sendMessageWithDelay(bot, remitente, {
             text: '❌ Error: No se encontraron datos de reserva.\n\nEscribe "menu" para ir al menú principal.'
         });
         await establecerEstado(remitente, null);
@@ -268,7 +340,7 @@ async function manejarPostReservaMenu(bot, remitente, mensaje, establecerEstado,
             case '1':
                 if (reserva.tipo === 'pendiente') {
                     // Enviar comprobante
-                    await bot.sendMessage(remitente, {
+                    await sendMessageWithDelay(bot, remitente, {
                         text: '📎 *ENVIAR COMPROBANTE*\n\n' +
                               'Por favor envía una foto o documento del comprobante de pago.\n\n' +
                               '✅ Formatos aceptados: JPG, PNG, PDF\n' +
@@ -278,7 +350,7 @@ async function manejarPostReservaMenu(bot, remitente, mensaje, establecerEstado,
                     await establecerEstado(remitente, 'post_reserva_esperando_comprobante', { reserva });
                 } else {
                     // Información de acceso
-                    await bot.sendMessage(remitente, {
+                    await sendMessageWithDelay(bot, remitente, {
                         text: '🔐 *INFORMACIÓN DE ACCESO*\n\n' +
                               `📅 Reserva: ${reserva.reservation_id}\n` +
                               `🏠 Alojamiento: ${reserva.cabin_name || 'Por confirmar'}\n` +
@@ -293,7 +365,7 @@ async function manejarPostReservaMenu(bot, remitente, mensaje, establecerEstado,
                 
             case '2':
                 // Modificar reserva
-                await bot.sendMessage(remitente, {
+                await sendMessageWithDelay(bot, remitente, {
                     text: '✏️ *MODIFICAR RESERVA*\n\n' +
                           'Para modificar tu reserva, un agente te asistirá.\n\n' +
                           '📞 En breve nos pondremos en contacto contigo.\n' +
@@ -305,7 +377,7 @@ async function manejarPostReservaMenu(bot, remitente, mensaje, establecerEstado,
                 
             case '3':
                 // Cancelar reserva
-                await bot.sendMessage(remitente, {
+                await sendMessageWithDelay(bot, remitente, {
                     text: '❌ *CANCELAR RESERVA*\n\n' +
                           '⚠️ ¿Estás seguro que deseas cancelar tu reserva?\n\n' +
                           `📅 Reserva: ${reserva.reservation_id}\n` +
@@ -319,7 +391,7 @@ async function manejarPostReservaMenu(bot, remitente, mensaje, establecerEstado,
                 
             case '4':
                 // Solicitar asistencia
-                await bot.sendMessage(remitente, {
+                await sendMessageWithDelay(bot, remitente, {
                     text: '🆘 *SOLICITAR ASISTENCIA*\n\n' +
                           'Un agente se pondrá en contacto contigo para brindarte asistencia.\n\n' +
                           '📱 Te contactaremos a este mismo número\n' +
@@ -331,14 +403,14 @@ async function manejarPostReservaMenu(bot, remitente, mensaje, establecerEstado,
                 break;
                 
             default:
-                await bot.sendMessage(remitente, {
+                await sendMessageWithDelay(bot, remitente, {
                     text: '❌ Opción no válida.\n\nPor favor selecciona una opción del 1 al 4.\n\nEscribe "menu" para volver al menú principal.'
                 });
                 break;
         }
     } catch (error) {
         console.error('Error en manejarPostReservaMenu:', error);
-        await bot.sendMessage(remitente, {
+        await sendMessageWithDelay(bot, remitente, {
             text: 'Lo siento, ocurrió un error. Por favor intenta de nuevo más tarde.\n\nEscribe "menu" para ir al menú principal.'
         });
     }
@@ -348,7 +420,7 @@ async function manejarNoReserva(bot, remitente, mensaje, establecerEstado) {
     console.log('### FUNCIÓN manejarNoReserva LLAMADA ###');
     
     if (mensaje === '1') {
-        await bot.sendMessage(remitente, {
+        await sendMessageWithDelay(bot, remitente, {
             text: '👥 *CONTACTAR AGENTE*\n\n' +
                   'En un momento un agente se comunicará contigo para asistirte.\n\n' +
                   'Horarios de atención:\n' +
@@ -358,12 +430,12 @@ async function manejarNoReserva(bot, remitente, mensaje, establecerEstado) {
         });
         await establecerEstado(remitente, 'esperando_agente');
     } else if (mensaje === '2') {
-        await bot.sendMessage(remitente, {
+        await sendMessageWithDelay(bot, remitente, {
             text: '🏠 Has vuelto al menú principal.\n\nEscribe "menu" para ver las opciones disponibles.'
         });
         await establecerEstado(remitente, null);
     } else {
-        await bot.sendMessage(remitente, {
+        await sendMessageWithDelay(bot, remitente, {
             text: '❌ Opción no válida.\n\nPor favor responde:\n1. Hablar con un agente\n2. Volver al menú principal\n\nEscribe "menu" para ir al menú principal.'
         });
     }
@@ -377,7 +449,7 @@ async function procesarComprobantePostReserva(bot, remitente, mensajeObj, establ
         const reserva = datos?.reserva;
         
         if (!reserva) {
-            await bot.sendMessage(remitente, {
+            await sendMessageWithDelay(bot, remitente, {
                 text: '❌ Error: No se encontraron datos de reserva.\n\nEscribe "menu" para ir al menú principal.'
             });
             await establecerEstado(remitente, null);
@@ -406,7 +478,20 @@ async function procesarComprobantePostReserva(bot, remitente, mensajeObj, establ
         
         await reenviarComprobanteAlGrupo(bot, mensajeObj, datosCliente, infoReserva);
         
-        await bot.sendMessage(remitente, {
+        // ✅ ENVIAR COMANDO /reservado también en post-reserva
+        try {
+            if (reserva && reserva.reservation_id) {
+                console.log(`[DEBUG] Enviando comando /reservado ${reserva.reservation_id} desde post-reserva`);
+                await bot.sendMessage(GRUPO_JID, { text: `/reservado ${reserva.reservation_id}` });
+                console.log(`[DEBUG] ✅ Comando /reservado ${reserva.reservation_id} enviado exitosamente desde post-reserva`);
+            } else {
+                console.log(`[ERROR] No se encontró reservation_id en post-reserva`);
+            }
+        } catch (error) {
+            console.error(`[ERROR] Error enviando comando /reservado en post-reserva: ${error.message}`);
+        }
+        
+        await sendMessageWithDelay(bot, remitente, {
             text: '✅ *COMPROBANTE RECIBIDO*\n\n' +
                   '📎 Hemos recibido tu comprobante de pago.\n\n' +
                   '⏳ Tu reserva está siendo procesada por nuestro equipo.\n' +
@@ -419,7 +504,7 @@ async function procesarComprobantePostReserva(bot, remitente, mensajeObj, establ
         
     } catch (error) {
         console.error('Error procesando comprobante:', error);
-        await bot.sendMessage(remitente, {
+        await sendMessageWithDelay(bot, remitente, {
             text: 'Lo siento, ocurrió un error al procesar tu comprobante. Por favor intenta de nuevo.\n\nEscribe "menu" para ir al menú principal.'
         });
     }
@@ -434,7 +519,7 @@ async function handlePostActividadState(bot, remitente, mensajeTexto, establecer
             // Ver más actividades - volver al menú de actividades
             const { generateDynamicMenu } = require('../mainMenuHandler');
             const menuActividades = await generateDynamicMenu('actividades');
-            await bot.sendMessage(remitente, { text: menuActividades });
+            await sendMessageWithDelay(bot, remitente, { text: menuActividades });
             await establecerEstado(remitente, 'actividades');
             break;
             
@@ -445,7 +530,7 @@ async function handlePostActividadState(bot, remitente, mensajeTexto, establecer
             break;
             
         default:
-            await bot.sendMessage(remitente, {
+            await sendMessageWithDelay(bot, remitente, {
                 text: '⚠️ Opción no válida.\n\n' +
                       '🔹 Escribe *1* para ver más actividades\n' +
                       '🔹 Escribe *0* para ir al menú principal'

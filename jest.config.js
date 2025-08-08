@@ -8,7 +8,7 @@ module.exports = {
   testEnvironment: 'node',
   
   // Archivos de setup
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup-simple.js'],
   setupFiles: ['<rootDir>/tests/env.setup.js'],
   
   // Directorios de pruebas

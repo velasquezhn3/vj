@@ -28,6 +28,14 @@ async function enviarReservaAlGrupo(bot, reserva) {
 ❌ Usa /cancelar ${reserva.reservation_id || reserva._id} para rechazar
         `;
         await safeSend(bot, GRUPO_JID, resumen);
+        
+        // SIEMPRE enviar comando /reservado en mensaje separado (para copy/paste fácil)
+        await safeSend(bot, GRUPO_JID, `/reservado ${reserva.reservation_id || reserva._id}`);
+        
+        /* MENSAJE CON INSTRUCCIONES ELIMINADO por solicitud del usuario
+        await safeSend(bot, GRUPO_JID, `🔄 *COMANDO LISTO PARA COPIAR:*\n\n\`/reservado ${reserva.reservation_id || reserva._id}\`\n\n📋 *Instrucciones:*\n• Copia el comando de arriba\n• Pégalo en el chat para confirmar la reserva\n• O usa /cancelar ${reserva.reservation_id || reserva._id} para rechazar`);
+        */
+        
     } catch (error) {
         console.error('[ERROR] enviarReservaAlGrupo:', error);
     }

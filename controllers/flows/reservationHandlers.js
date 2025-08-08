@@ -309,6 +309,25 @@ async function handleConfirmarCommandRobust(bot, remitente, param, mensajeObj) {
     userId = normalizePhoneNumber(userId);
     logger.info('🛡️ [CONFIRMAR ROBUSTO] Normalized userId:', userId);
 
+    // ✅ VALIDACIÓN ANTI-DUPLICADOS: Verificar si ya existe una reserva pendiente reciente
+    try {
+      const { checkRecentPendingReservation } = require('../../services/reservaService');
+      const recentReservation = await checkRecentPendingReservation(userId);
+      
+      if (recentReservation) {
+        logger.warn('🛡️ [CONFIRMAR ROBUSTO] Reserva pendiente reciente encontrada, evitando duplicado');
+        
+        const mensaje = `⚠️ Ya tienes una reserva pendiente reciente (ID: ${recentReservation.reservation_id}).\n\n` +
+                       `Si necesitas hacer otra reserva, espera unos minutos o contacta al administrador.`;
+        
+        await safeSend(bot, remitente, mensaje);
+        return; // Salir sin crear duplicado
+      }
+    } catch (duplicateCheckError) {
+      logger.error('❌ Error verificando duplicados:', duplicateCheckError);
+      // Continuar con el proceso normal si hay error en la verificación
+    }
+
     const latestState = await obtenerEstado(userId + '@s.whatsapp.net');
     console.log('🔍 [DEBUG] Estado completo obtenido:', JSON.stringify(latestState, null, 2));
     
@@ -614,6 +633,25 @@ El Equipo de Reservas Vj 💚
 async function crearReservaDirectaRobusta(bot, remitente, userId, userName, datosReales = null) {
   try {
     logger.info('🚀 [RESERVA ROBUSTA] Iniciando para:', userId, userName);
+    
+    // ✅ VALIDACIÓN ANTI-DUPLICADOS también en función de respaldo
+    try {
+      const { checkRecentPendingReservation } = require('../../services/reservaService');
+      const recentReservation = await checkRecentPendingReservation(userId);
+      
+      if (recentReservation) {
+        logger.warn('🚀 [RESERVA ROBUSTA] Reserva pendiente reciente encontrada, evitando duplicado');
+        
+        const mensaje = `⚠️ Ya tienes una reserva pendiente reciente (ID: ${recentReservation.reservation_id}).\n\n` +
+                       `Si necesitas hacer otra reserva, espera unos minutos.`;
+        
+        await safeSend(bot, remitente, mensaje);
+        return; // Salir sin crear duplicado
+      }
+    } catch (duplicateCheckError) {
+      logger.error('❌ Error verificando duplicados en función de respaldo:', duplicateCheckError);
+      // Continuar con el proceso normal si hay error en la verificación
+    }
     
     let fechaInicio, fechaFin, personas, tipoCabana, precioTotal, nombreReal;
     

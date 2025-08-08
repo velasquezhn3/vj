@@ -7,8 +7,14 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const logger = require('../config/logger');
 
-// Clave secreta para JWT (DEBE venir de variables de entorno)
-const JWT_SECRET = process.env.JWT_SECRET || 'vj_secret_key_2024_admin_dashboard_CHANGE_IN_PRODUCTION';
+// Clave secreta para JWT (OBLIGATORIO de variables de entorno)
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  logger.error('❌ CRITICAL ERROR: JWT_SECRET no está definido en las variables de entorno');
+  logger.error('💡 Crea un archivo .env basado en .env.example y define JWT_SECRET');
+  process.exit(1);
+}
 
 // Lista de tokens revocados (en producción usar Redis)
 const revokedTokens = new Set();

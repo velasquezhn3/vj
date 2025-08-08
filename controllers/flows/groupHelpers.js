@@ -69,6 +69,13 @@ async function enviarReservaAlGrupo(bot, reserva) {
     await safeSend(bot, GRUPO_JID, resumen);
     logger.info(`Resumen de reserva enviado al grupo para ID: ${reservationId}`);
     
+    // SIEMPRE enviar comando /reservado en mensaje separado (para copy/paste fácil)
+    await safeSend(bot, GRUPO_JID, `/reservado ${reservationId}`);
+    
+    /* MENSAJE CON INSTRUCCIONES ELIMINADO por solicitud del usuario
+    await safeSend(bot, GRUPO_JID, `🔄 *COMANDO LISTO PARA COPIAR:*\n\n\`/reservado ${reservationId}\`\n\n📋 *Instrucciones:*\n• Copia el comando de arriba\n• Pégalo en el chat para confirmar la reserva\n• O usa /cancelar ${reservationId} para rechazar`);
+    */
+    
   } catch (error) {
     logger.error('[ERROR] enviarReservaAlGrupo:', {
       error: error.message,

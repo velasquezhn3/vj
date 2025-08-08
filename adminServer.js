@@ -1,3 +1,6 @@
+// Cargar variables de entorno al inicio
+require('dotenv').config();
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -498,12 +501,16 @@ const adminDashboardRoutes = require('./routes/adminDashboard');
 const adminCabinTypesRoutes = require('./routes/adminCabinTypes');
 const adminUsersRoutes = require('./routes/adminUsers');
 const adminActivitiesRoutes = require('./routes/adminActivities');
+const queueRoutes = require('./routes/queueRoutes');
 
 // Dashboard, Cabin Types, Activities y Admin Users routes (PROTEGIDAS)
 app.use('/admin/dashboard', authenticateToken, adminDashboardRoutes);
 app.use('/admin/cabin-types', authenticateToken, adminCabinTypesRoutes);
 app.use('/admin/activities', authenticateToken, adminActivitiesRoutes);
 app.use('/admin/admin-users', authenticateToken, adminUsersRoutes);
+
+// Queue Management routes (PROTEGIDAS)
+app.use('/api/bot', authenticateToken, queueRoutes);
 
 // Conversation States routes (PROTEGIDAS)
 app.get('/admin/conversation-states', authenticateToken, async (req, res) => {
@@ -963,4 +970,18 @@ app.listen(PORT, () => {
   // Iniciar servicio de backup automático
   console.log('🔄 Iniciando servicio de backup automático...');
   backupService.start();
+  
+  // Inicializar sistema de colas WhatsApp de forma segura
+  console.log('🔄 Inicializando sistema de colas WhatsApp...');
+  setTimeout(async () => {
+    try {
+      const { getQueueManager } = require('./services/whatsappQueueService');
+      const queueManager = getQueueManager();
+      await queueManager.init();
+      console.log('✅ Sistema de colas inicializado correctamente');
+    } catch (error) {
+      console.error('❌ Error inicializando sistema de colas:', error.message);
+      console.log('⚠️ El sistema funcionará en modo fallback sin colas');
+    }
+  }, 1000); // Retrasar la inicialización 1 segundo
 });
