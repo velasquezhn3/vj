@@ -2,8 +2,8 @@
 require('dotenv').config();
 
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
+const bodyParser = require('body-parser');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 
@@ -45,6 +45,19 @@ const backupService = require('./services/backupService');
 
 const app = express();
 const PORT = 4000;
+
+// CORS configurado (debe ir antes que cualquier otro middleware)
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // ============================================================================
 // CONFIGURACIÓN DE SEGURIDAD
