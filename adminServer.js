@@ -46,6 +46,12 @@ const backupService = require('./services/backupService');
 const app = express();
 const PORT = 4000;
 
+// Logging antes de CORS
+app.use((req, res, next) => {
+  console.log(`[PRE-CORS] ${req.method} ${req.originalUrl} | Origin: ${req.headers.origin}`);
+  next();
+});
+
 // CORS configurado (debe ir antes que cualquier otro middleware)
 app.use(cors({
   origin: [
@@ -58,6 +64,14 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Logging después de CORS
+app.use((req, res, next) => {
+  console.log(`[POST-CORS] ${req.method} ${req.originalUrl} | Headers:`, res.getHeaders());
+  next();
+});
+
+// ...existing code...
 
 // ============================================================================
 // CONFIGURACIÓN DE SEGURIDAD
@@ -72,18 +86,7 @@ app.use(securityLogger);
 // Rate limiting general - DESACTIVADO PARA DESARROLLO
 // app.use('/admin', generalLimiter);
 
-// CORS configurado
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3001'
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// ...existing code...
 
 // Parseo de body
 app.use(bodyParser.json({ limit: '10mb' }));
